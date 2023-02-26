@@ -1,3 +1,6 @@
+#define WM_SOCKET (WM_USER + 1)
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
 int _tmain() {
     // Initialize Winsock
 	WSADATA wsaData;
@@ -95,6 +98,7 @@ if (hWnd == NULL) {
 }
 
 
+	WSAAsyncSelect(clientSock, hWnd, WM_SOCKET, FD_READ | FD_CLOSE);
 
 	// Set up a device context for the server-side window
 	HDC hdc = GetDC(hWnd);
@@ -167,5 +171,39 @@ DeleteObject(hBitmap);
 closesocket(clientSock);
 closesocket(sock);
 WSACleanup();
+return 0;
+}
+
+
+// Window procedure for the window that will display the received screen data
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+switch (message) {
+case WM_DESTROY:
+PostQuitMessage(0);
+break;
+default:
+return DefWindowProc(hWnd, message, wParam, lParam);
+
+case WM_SOCKET:
+    if (WSAGETSELECTERROR(lParam)) {
+        std::cerr << "Socket error: " << WSAGETSELECTERROR(lParam) << std::endl;
+        closesocket(wParam);
+        break;
+    }
+    switch (WSAGETSELECTEVENT(lParam)) {
+        case FD_READ:
+            // Handle new data to receive
+            // ...
+            WSAAsyncSelect(wParam, hWnd, WM_SOCKET, FD_READ);
+            break;
+        case FD_CLOSE:
+            closesocket(wParam);
+            break;
+        default:
+            break;
+    }
+    break;
+
+}
 return 0;
 }
