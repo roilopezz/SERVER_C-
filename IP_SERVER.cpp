@@ -1,11 +1,11 @@
 int _tmain() {
     // Initialize Winsock
-    WSADATA wsaData = {};
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cout << "WSAStartup failed: " << result << std::endl;
-        return 1;
-    }
+	WSADATA wsaData;
+	int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (result != 0) {
+    std::cout << "WSAStartup failed: " << result << std::endl;
+    return 1;
+	}
 
     // Create a socket to listen for incoming connections
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -65,10 +65,6 @@ while (received < sizeof(buffer)) {
 }
 
 
-
-
-
-
     // Register a window class for the window that will display the received screen data
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASSEX wc = {};
@@ -88,6 +84,8 @@ while (received < sizeof(buffer)) {
     WS_POPUP,
     0, 0, 800, 600,
     NULL, NULL, hInstance, NULL);
+
+
 if (hWnd == NULL) {
     std::cout << "CreateWindowEx failed: " << GetLastError() << std::endl;
     closesocket(clientSock);
@@ -101,11 +99,11 @@ if (hWnd == NULL) {
 	// Set up a device context for the server-side window
 	HDC hdc = GetDC(hWnd);
 
-
+	// HDC hdc = GetDC(hWnd); // define hdc inside the loop
 
 // Iterate over the received screen data and set the pixel color on the server-side window
 for (int y = 0; y < SCREEN_HEIGHT; y++) {
-    HDC hdc = GetDC(hWnd); // define hdc inside the loop
+   
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         int i = (y * SCREEN_WIDTH + x) * 3;
         BYTE b = (BYTE)buffer[i];
@@ -113,7 +111,6 @@ for (int y = 0; y < SCREEN_HEIGHT; y++) {
         BYTE r = (BYTE)buffer[i+2];
         SetPixel(hdc, x, y, RGB(r, g, b));
     }
-    //ReleaseDC(hWnd, hdc); // release hdc after the inner loop
 }
 
 
