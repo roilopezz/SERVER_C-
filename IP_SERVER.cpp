@@ -1,98 +1,139 @@
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
 int _tmain() {
     // Initialize Winsock
-    WSADATA wsa_data;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+    WSADATA wsaData = {};
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (result != 0) {
-        std::cerr << "WSAStartup failed: " << result << "\n";
+        std::cout << "WSAStartup failed: " << result << std::endl;
         return 1;
     }
 
-    // Create socket
-    SOCKET server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (server_socket == INVALID_SOCKET) {
-        std::cerr<< "Failed to create socket: " << WSAGetLastError() << "\n";
-WSACleanup();
-return 1;
-}
-	// Bind socket to port
-sockaddr_in server_address;
-server_address.sin_family = AF_INET;
-server_address.sin_addr.s_addr =  htonl(INADDR_ANY);;
-server_address.sin_port = htons(SERVER_PORT);
-result = bind(server_socket, (sockaddr*) &server_address, sizeof(server_address));
-if (result == SOCKET_ERROR) {
-    std::cerr << "Failed to bind socket to port: " << WSAGetLastError() << "\n";
-    closesocket(server_socket);
-    WSACleanup();
-    return 1;
-}
-
-// Listen for incoming connections
-result = listen(server_socket, SOMAXCONN);
-if (result == SOCKET_ERROR) {
-    std::cerr << "Failed to listen for incoming connections: " << WSAGetLastError() << "\n";
-    closesocket(server_socket);
-    WSACleanup();
-    return 1;
-}
-
-// Loop to accept incoming connections
-while (true) {
-    // Accept incoming connection
-    sockaddr_in client_address;
-    int address_size = sizeof(client_address);
-    SOCKET client_socket = accept(server_socket, (sockaddr*) &client_address, &address_size);
-    if (client_socket == INVALID_SOCKET) {
-        std::cerr << "Failed to accept incoming connection: " << WSAGetLastError() << "\n";
-        continue;
+    // Create a socket to listen for incoming connections
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == INVALID_SOCKET) {
+        std::cout << "socket failed: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        return 1;
     }
 
-    // Prompt user to choose which screen to display based on client IP
-    char ip_address[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &client_address.sin_addr, ip_address, INET_ADDRSTRLEN);
-    std::cout << "Client connected from IP address: " << ip_address << "\n";
-    std::cout << "Enter 1 to view screen: ";
-    int choice;
-    std::cin >> choice;
-
-    // Receive bitmap data from client
-    int buffer_size = SCREEN_WIDTH * SCREEN_HEIGHT * 3;
-    char* buffer = new char[buffer_size];
-    result = recv(client_socket, buffer, buffer_size, 0);
+    // Bind the socket to a local address and port
+    sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(12345);
+    result = bind(sock, (sockaddr*)&addr, sizeof(addr));
     if (result == SOCKET_ERROR) {
-        std::cerr << "Failed to receive bitmap data: " << WSAGetLastError() << "\n";
-        closesocket(client_socket);
-        continue;
+        std::cout << "bind failed: " << WSAGetLastError() << std::endl;
+        closesocket(sock);
+        WSACleanup();
+        return 1;
     }
 
-    // Display received bitmap data
-    HDC screen_dc = GetDC(NULL);
-    HDC memory_dc = CreateCompatibleDC(screen_dc);
-    HBITMAP bitmap = CreateCompatibleBitmap(screen_dc, SCREEN_WIDTH, SCREEN_HEIGHT);
-    SelectObject(memory_dc, bitmap);
-
-    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT * 3; i += 3) {
-        int x = (i / 3) % SCREEN_WIDTH;
-        int y = (i / 3) / SCREEN_WIDTH;
-        COLORREF color = RGB(buffer[i + 2], buffer[i + 1], buffer[i]);
-        SetPixel(memory_dc, x, y, color);
+    // Listen for incoming connections
+    result = listen(sock, SOMAXCONN);
+    if (result == SOCKET_ERROR) {
+        std::cout << "listen failed: " << WSAGetLastError() << std::endl;
+        closesocket(sock);
+        WSACleanup();
+        return 1;
     }
 
-    HDC window_dc = GetDC(GetDesktopWindow());
-    BitBlt(window_dc, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, memory_dc, 0, 0, SRCCOPY);
+    // Accept an incoming connection
+    SOCKET clientSock = accept(sock, NULL, NULL);
+    if (clientSock == INVALID_SOCKET) {
+        std::cout << "accept failed: " << WSAGetLastError() << std::endl;
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
 
-    // Clean up resources
-    ReleaseDC(NULL, screen_dc);
-    ReleaseDC(GetDesktopWindow(), window_dc);
-    DeleteObject(bitmap);
-    DeleteDC(memory_dc);
-    closesocket(client_socket);
-}
+    // Register a window class for the window that will display the received screen data
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszClassName = "WindowClass";
+    RegisterClassEx(&wc);
 
-// Clean up Winsock
-closesocket(server_socket);
+    // Create a window to display the received screen data
+    HWND hWnd = CreateWindowEx(
+        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
+        "WindowClass",
+        "Remote Screen",
+        WS_POPUP,
+        0, 0, 800, 600,
+        NULL, NULL, hInstance, NULL);
+    if (hWnd == NULL) {
+        std::cout << "CreateWindowEx failed: " << GetLastError() << std::endl;
+        closesocket(clientSock);
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
+
+    // Make the window transparent and layered
+    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
+    // Show the window
+    ShowWindow(hWnd, SW_SHOW);
+
+// Receive screen data from the client
+std::vector<char> buffer(BUF_SIZE);
+int bytesReceived = 0;
+int totalBytesReceived = 0;
+do {
+    bytesReceived = recv(clientSock, &buffer[totalBytesReceived], BUF_SIZE - totalBytesReceived, 0);
+    if (bytesReceived == SOCKET_ERROR) {
+        std::cout << "recv failed: " << WSAGetLastError() << std::endl;
+        closesocket(clientSock);
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
+    totalBytesReceived += bytesReceived;
+} while (totalBytesReceived < BUF_SIZE);
+
+// Create a bitmap from the received screen data
+BITMAPINFO bmi = {};
+bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+bmi.bmiHeader.biWidth = 640;
+bmi.bmiHeader.biHeight = 480;
+bmi.bmiHeader.biPlanes = 1;
+bmi.bmiHeader.biBitCount = 24;
+bmi.bmiHeader.biCompression = BI_RGB;
+HBITMAP hBitmap = CreateDIBitmap(GetDC(NULL), &(bmi.bmiHeader), CBM_INIT, &buffer[0], &bmi, DIB_RGB_COLORS);
+
+// Display the bitmap in the window
+HDC hdc = GetDC(hWnd);
+HDC memDC = CreateCompatibleDC(hdc);
+HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, hBitmap);
+BitBlt(hdc, 0, 0, 640, 480, memDC, 0, 0, SRCCOPY);
+SelectObject(memDC, oldBitmap);
+DeleteDC(memDC);
+ReleaseDC(hWnd, hdc);
+
+// Cleanup
+DeleteObject(hBitmap);
+closesocket(clientSock);
+closesocket(sock);
 WSACleanup();
-
 return 0;
 }
 
+
+// Window procedure for the window that will display the received screen data
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+switch (message) {
+case WM_DESTROY:
+PostQuitMessage(0);
+break;
+default:
+return DefWindowProc(hWnd, message, wParam, lParam);
+}
+return 0;
+}
