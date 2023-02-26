@@ -1,163 +1,216 @@
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    switch (message) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+int _tmain(int argc, _TCHAR* argv[])
+{
+	int		b, l, on = 1;
+	char	recvbuf[100], banforever='0'; 
+	char	buf[100];
+	SOCKET	s, sa;
+	struct	sockaddr_in channel;  // holds IP address
+	WORD	wVersionRequested;
+	WSADATA wsaData;
+	int		err;
+	int		bytesRecv;
+	unsigned char MACData[6];
+	char HostNameData[20];
+	char RemoteIP[17];
+	char ban_status;
+	char User_Name[20]={0};
+	char add_ban;
+	char BanReason[30]={0};
+	int i;
+	SYSTEMTIME st;
+
+
+	printf(" \n");
+	printf("-------------------------------------------------------------- \n");
+	printf(" \n");
+	printf(" === Anti-Hack Server by RoiLopez === \n");
+	printf(" \n");
+	//GetMACaddress();
+	ReadInis(); // Load Config
+	printf(" \n");
+	printf(" Users Connections : \n");
+	printf(" \n");
+
+
+	InitLogFile();
+
+	wVersionRequested = MAKEWORD( 1, 1 );
+	err = WSAStartup( wVersionRequested, &wsaData );
+
+	if ( err != 0 ) {
+		printf("WSAStartup error %ld", WSAGetLastError() );
+		WSACleanup();
+		return false;
+	}
+	//------------------------------------------------------
+
+	                
+
+	//---- Build address structure to bind to socket.--------  
+	memset(&channel, 0, sizeof(channel));// zerochannel 
+	channel.sin_family = AF_INET; 
+	channel.sin_addr.s_addr = htonl(INADDR_ANY); 
+	channel.sin_port = htons(SERVER_PORT); 
+	//--------------------------------------------------------
+
+	// keep track of the number of connections
+	int numConnections = 0;
+
+	// ---- create SOCKET--------------------------------------
+	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
+	if (s < 0) {
+		printf("socket error %ld",WSAGetLastError() );
+		WSACleanup();
+		return false;
+	}
+
+	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on)); 
+	//---------------------------------------------------------
+
+	//---- BIND socket ----------------------------------------
+	b = bind(s, (struct sockaddr *) &channel, sizeof(channel)); 
+
+	if (b < 0) {
+		printf("bind error %ld", WSAGetLastError() ); 
+		WSACleanup();
+		return false;
+	}
+	//----------------------------------------------------------
+
+
+	//---- LISTEN socket ----------------------------------------
+	l = listen(s, QUEUE_SIZE);                 // specify queue size 
+	if (l < 0) {
+		printf("listen error %ld",WSAGetLastError() );
+		WSACleanup();
+		return false;
+	}
+	//-----------------------------------------------------------
+	while (1) {
+	//---- ACCEPT connection ------------------------------------
+	//sa = accept(s, 0 , 0);                  // block for connection request  
+	int clientAddrLen = sizeof(channel);
+	sa = accept(s, (SOCKADDR*)&channel, &clientAddrLen);
+
+	if (sa < 0) {
+		printf("accept error %ld ", WSAGetLastError() ); 
+		WSACleanup();
+		return false;
+	}
+	//------------------------------------------------------------
+	// Socket is now set up and bound. Wait for connection and process it. 
+	
+	//---- RECV bytes --------------------------------------------
+	bytesRecv = recv( sa, recvbuf, sizeof(recvbuf), 0 );
+
+	//err = WSAGetLastError( );// 10057 = A request to send or receive data was disallowed because the socket is not connected and (when sending on a datagram socket using a sendto call) 
+	if ( bytesRecv == 0 || bytesRecv == WSAECONNRESET  || bytesRecv == INVALID_SOCKET) {
+      printf( "Connection Closed.\n");
+	  WSACleanup();
+	  return false;
+
     }
-    return 0;
+
+	//------------------------------------------------------------
+	// START OF DEFINE DATA RECV!!!!!!!!!!!
+	//---------------------------------------------------------------
+
+
+	for(i=0;i<=5;i++){
+		MACData[i]=recvbuf[i];
+	}
+	for(i=6;i <= 20 ; i++){
+		HostNameData[i-6]=recvbuf[i];	
+	}
+	for(i=21;i<=37;i++){
+		RemoteIP[i-21]=recvbuf[i];
+		ban_status=recvbuf[38];				//SAVE BAN STATUS
+	}
+
+
+	for(i=39; i <= 59 ; i++){
+		User_Name[i-39]=recvbuf[i];	//SAVE USERNAME
+	}
+
+	if (strcmp(User_Name,"") == 0){
+		strcpy(User_Name,"No_Name");
+	}
+
+
+	for(i=61; i <= 90 ; i++){
+		BanReason[i-61]=recvbuf[i]; //SAVE USERNAME
+	}				
+
+	//BanReason = 1 = Memory_scan , 2 = Title Scan , 3 = Wrond Client
+
+	add_ban=recvbuf[60];	//SAVE ADD BAN
+	GetLocalTime(&st);
+
+
+	//if(didlogonscr==1 || add_ban=='1'){
+	if(add_ban=='1' || Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban) ==  '1'){
+
+
+		if(Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban) ==  '1'){
+		printf(" -User Blocking : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)
+		
+		}else if(bytesRecv > 0){
+		printf(" -System Block User : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)
+		}
+
+
+	}else{
+	printf(" -User connected : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)	
+	}
+
+
+	if(didlogtxt == 1 ){
+	PrintLog(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban);
+	}
+
+	if (add_ban=='1'){
+		Print_Ban_Logs(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban,BanReason);
+
+		if(BanReason[0] != '2' || didbanname == 1 ){
+			Print_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban,BanReason);
+			buf[0]='3';	
+		}
+
+		else{
+			buf[0]='5';	
+		}
+	}
+
+	else{
+		buf[0]=Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban);
+	}
+	
+
+	
+	if (recvbuf[99]=='9'){
+		exit(0);
+	}
+
+	if (recvbuf[98]=='9'){
+		banforever='1';
+	}
+
+
+	buf[1]=ServerVers[0];
+	buf[2]=ServerVers[1];
+	buf[3]=AutoBanTime;
+
+	if (banforever=='1')
+	buf[0]='1'; 
+
+	bytesRecv = send( sa, buf, 100, 0 ); 
+	closesocket( sa );
+	}
+
+
+
+
+	closesocket( s );
+	WSACleanup();
+	return 0;
 }
-
-void CreateAndShowWindow(HINSTANCE hInstance, LPCSTR className, LPCSTR windowName, int width, int height) {
-    // Register the window class
-    WNDCLASSEX wc = {};
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = className;
-    RegisterClassEx(&wc);
-
-    // Create the window
-    HWND hWnd = CreateWindowEx(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
-        className,
-        windowName,
-        WS_POPUP,
-        0, 0, width, height,
-        NULL, NULL, hInstance, NULL);
-
-    if (hWnd == NULL) {
-        std::cout << "CreateWindowEx failed: " << GetLastError() << std::endl;
-        return;
-    }
-
-    // Make the window transparent and layered
-    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-
-    // Show the window
-    ShowWindow(hWnd, SW_SHOW);
-}
-
-void ReceiveScreenData(SOCKET clientSock, HWND hWnd) {
-    // Allocate memory for the screen data buffer
-    const int bufferLength = SCREEN_WIDTH * SCREEN_HEIGHT * 3;
-    char* buffer = new char[bufferLength];
-
-    // Set up a device context for the server-side window
-    HDC hdc = GetDC(hWnd);
-
-    while (true) {
-        // Receive the screen data
-        int bytesReceived = recv(clientSock, buffer, bufferLength, 0);
-        if (bytesReceived == SOCKET_ERROR) {
-            std::cout << "recv failed: " << WSAGetLastError() << std::endl;
-            break;
-        }else if (bytesReceived == 0) {
-        // The client closed the connection, so we can exit the loop
-        closesocket(clientSock);
-        break;
-    }
-}
-
-	send(clientSock, "ACK", 3, 0);
-
-    // Copy the received data to the buffer for the window
-    memcpy(buffer, buffer, SCREEN_WIDTH * SCREEN_HEIGHT * 3);
-
-    // Set up a device context for the server-side window
-    HDC hdc = GetDC(hWnd);
-
-    // Iterate over the received screen data and set the pixel color on the server-side window
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
-        for (int x = 0; x < SCREEN_WIDTH; x++) {
-            int i = (y * SCREEN_WIDTH + x) * 3;
-            BYTE b = (BYTE)buffer[i];
-            BYTE g = (BYTE)buffer[i+1];
-            BYTE r = (BYTE)buffer[i+2];
-            SetPixel(hdc, x, y, RGB(r, g, b));
-        }
-    }
-
-    // Release the device context
-    ReleaseDC(hWnd, hdc);
-
-	    // Make the window transparent and layered
-    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-
-    // Show the window
-    ShowWindow(hWnd, SW_SHOW);
-
-    //delete[] buffer;
-}
-
-
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-int _tmain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    const char* className = "WindowClass";
-    const char* windowTitle = "Remote Screen";
-
-    CreateAndShowWindow(hInstance, className, windowTitle, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cout << "WSAStartup failed" << std::endl;
-        return 1;
-    }
-
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == INVALID_SOCKET) {
-        std::cout << "socket failed with error: " << WSAGetLastError() << std::endl;
-        WSACleanup();
-        return 1;
-    }
-
-    SOCKADDR_IN serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(12345);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-
-    if (bind(sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cout << "bind failed with error: " << WSAGetLastError() << std::endl;
-        closesocket(sock);
-        WSACleanup();
-        return 1;
-    }
-
-    if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
-        std::cout << "listen failed with error: " << WSAGetLastError() << std::endl;
-        closesocket(sock);
-        WSACleanup();
-        return 1;
-    }
-
-    std::cout << "Waiting for incoming connections..." << std::endl;
-
-    while (true) {
-        SOCKADDR_IN clientAddr;
-        int clientAddrSize = sizeof(clientAddr);
-        SOCKET clientSock = accept(sock, (SOCKADDR*)&clientAddr, &clientAddrSize);
-        if (clientSock == INVALID_SOCKET) {
-            std::cout << "accept failed with error: " << WSAGetLastError() << std::endl;
-            closesocket(sock);
-            WSACleanup();
-            return 1;
-        }
-
-        std::cout << "Client connected" << std::endl;
-
-        ReceiveScreenData(clientSock, FindWindow(className, windowTitle));
-
-        closesocket(clientSock);
-    }
-
-    closesocket(sock);
-    WSACleanup();
-
-    return 0;
-}
-
-
