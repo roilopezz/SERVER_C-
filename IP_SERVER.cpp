@@ -48,6 +48,21 @@ int _tmain() {
         return 1;
     }
 
+
+char recv_buffer[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
+memset(recv_buffer, 0, sizeof(recv_buffer));  // initialize the buffer with zeroes
+
+// Receive the screen data from the client
+int bytes_received = recv(clientSock, recv_buffer, sizeof(recv_buffer), 0);
+if (bytes_received == SOCKET_ERROR) {
+    std::cerr << "Failed to receive screen data: " << WSAGetLastError() << std::endl;
+    closesocket(clientSock);
+    closesocket(sock);
+    WSACleanup();
+    return 1;
+}
+
+
     // Register a window class for the window that will display the received screen data
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASSEX wc = {};
@@ -60,27 +75,47 @@ int _tmain() {
     wc.lpszClassName = "WindowClass";
     RegisterClassEx(&wc);
 
-    // Create a window to display the received screen data
-    HWND hWnd = CreateWindowEx(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
-        "WindowClass",
-        "Remote Screen",
-        WS_POPUP,
-        0, 0, 800, 600,
-        NULL, NULL, hInstance, NULL);
-    if (hWnd == NULL) {
-        std::cout << "CreateWindowEx failed: " << GetLastError() << std::endl;
-        closesocket(clientSock);
-        closesocket(sock);
-        WSACleanup();
-        return 1;
+HWND hWnd = CreateWindowEx(
+    WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
+    "WindowClass",
+    "Remote Screen",
+    WS_POPUP,
+    0, 0, 800, 600,
+    NULL, NULL, hInstance, NULL);
+if (hWnd == NULL) {
+    std::cout << "CreateWindowEx failed: " << GetLastError() << std::endl;
+    closesocket(clientSock);
+    closesocket(sock);
+    WSACleanup();
+    return 1;
+}
+
+// Set up a device context for the server-side window
+HDC hdc = GetDC(hWnd);
+
+// Iterate over the received screen data and set the pixel color on the server-side window
+for (int y = 0; y < SCREEN_HEIGHT; y++) {
+    HDC hdc = GetDC(hWnd); // define hdc inside the loop
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+        int i = (y * SCREEN_WIDTH + x) * 3;
+        BYTE b = (BYTE)recv_buffer[i];
+        BYTE g = (BYTE)recv_buffer[i+1];
+        BYTE r = (BYTE)recv_buffer[i+2];
+        SetPixel(hdc, x, y, RGB(r, g, b));
     }
+    //ReleaseDC(hWnd, hdc); // release hdc after the inner loop
+}
 
-    // Make the window transparent and layered
-    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+// Release the device context
+ReleaseDC(hWnd, hdc);
 
-    // Show the window
-    ShowWindow(hWnd, SW_SHOW);
+// Make the window transparent and layered
+SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
+// Show the window
+ShowWindow(hWnd, SW_SHOW);
+
+
 
 // Receive screen data from the client
 std::vector<char> buffer(BUF_SIZE);
@@ -109,7 +144,7 @@ bmi.bmiHeader.biCompression = BI_RGB;
 HBITMAP hBitmap = CreateDIBitmap(GetDC(NULL), &(bmi.bmiHeader), CBM_INIT, &buffer[0], &bmi, DIB_RGB_COLORS);
 
 // Display the bitmap in the window
-HDC hdc = GetDC(hWnd);
+//HDC hdc = GetDC(hWnd);
 HDC memDC = CreateCompatibleDC(hdc);
 HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, hBitmap);
 BitBlt(hdc, 0, 0, 640, 480, memDC, 0, 0, SRCCOPY);
