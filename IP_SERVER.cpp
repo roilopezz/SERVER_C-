@@ -54,35 +54,49 @@ void ReceiveScreenData(SOCKET clientSock, HWND hWnd) {
         if (bytesReceived == SOCKET_ERROR) {
             std::cout << "recv failed: " << WSAGetLastError() << std::endl;
             break;
-        }
+        }else if (bytesReceived == 0) {
+        // The client closed the connection, so we can exit the loop
+        closesocket(clientSock);
+        break;
+    }
+}
 
-        if (bytesReceived == 0) {
-            std::cout << "Connection closed" << std::endl;
-            break;
-        }
+	send(clientSock, "ACK", 3, 0);
 
-        // Iterate over the received screen data and set the pixel color on the server-side window
-        for (int y = 0; y < SCREEN_HEIGHT; y++) {
-            for (int x = 0; x < SCREEN_WIDTH; x++) {
-                int i = (y * SCREEN_WIDTH + x) * 3;
-                BYTE b = (BYTE)buffer[i];
-                BYTE g = (BYTE)buffer[i+1];
-                BYTE r = (BYTE)buffer[i+2];
-                SetPixel(hdc, x, y, RGB(r, g, b));
-            }
+    // Copy the received data to the buffer for the window
+    memcpy(buffer, buffer, SCREEN_WIDTH * SCREEN_HEIGHT * 3);
+
+    // Set up a device context for the server-side window
+    HDC hdc = GetDC(hWnd);
+
+    // Iterate over the received screen data and set the pixel color on the server-side window
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            int i = (y * SCREEN_WIDTH + x) * 3;
+            BYTE b = (BYTE)buffer[i];
+            BYTE g = (BYTE)buffer[i+1];
+            BYTE r = (BYTE)buffer[i+2];
+            SetPixel(hdc, x, y, RGB(r, g, b));
         }
     }
 
-    // Release the device context and free the buffer memory
+    // Release the device context
     ReleaseDC(hWnd, hdc);
-    delete[] buffer;
+
+	    // Make the window transparent and layered
+    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
+    // Show the window
+    ShowWindow(hWnd, SW_SHOW);
+
+    //delete[] buffer;
 }
 
 
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-int WINAPI _tmain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int _tmain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     const char* className = "WindowClass";
     const char* windowTitle = "Remote Screen";
 
@@ -145,3 +159,5 @@ int WINAPI _tmain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
     return 0;
 }
+
+
