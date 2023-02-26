@@ -1,0 +1,62 @@
+int main() {
+    // Initialize Winsock
+    WSADATA wsa_data;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+    if (result != 0) {
+        std::cerr << "WSAStartup failed: " << result << "\n";
+        return 1;
+    }
+
+    // Connect to server
+    SOCKET server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (server_socket == INVALID_SOCKET) {
+        std::cerr << "Failed to create socket: " << WSAGetLastError() << "\n";
+		MessageBoxA(NULL,PrintWellcomeLine "\n Failed to create socket \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
+        WSACleanup();
+        return 1;
+    }
+
+    sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(IPAddress);
+    server_address.sin_port = htons(SERVER_PORT);
+    result = connect(server_socket, (sockaddr*) &server_address, sizeof(server_address));
+
+    if (result == SOCKET_ERROR) {
+        std::cerr << "Failed to connect to server: " << WSAGetLastError() << "\n";
+		MessageBoxA(NULL,PrintWellcomeLine "\n Failed to connect to server \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
+        closesocket(server_socket);
+        WSACleanup();
+        return 1;
+    }
+
+    // Send screen data
+    HDC screen_dc = GetDC(NULL);
+    int bytes_per_pixel = 3;
+    int buffer_size = SCREEN_WIDTH * SCREEN_HEIGHT * bytes_per_pixel;
+    char* buffer = new char[buffer_size];
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            int i = (y * SCREEN_WIDTH + x) * bytes_per_pixel;
+            COLORREF color = GetPixel(screen_dc, x, y);
+            buffer[i] = GetBValue(color);
+            buffer[i+1] = GetGValue(color);
+            buffer[i+2] = GetRValue(color);
+        }
+    }
+
+    result = send(server_socket, buffer, buffer_size, 0);
+    if (result == SOCKET_ERROR) {
+        std::cerr << "Failed to send screen data: " << WSAGetLastError() << "\n";
+		MessageBoxA(NULL,PrintWellcomeLine "\n Failed to send screen data: \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
+
+    }
+
+    // Cleanup
+    delete[] buffer;
+    ReleaseDC(NULL, screen_dc);
+    closesocket(server_socket);
+    WSACleanup();
+
+    return 0;
+}
