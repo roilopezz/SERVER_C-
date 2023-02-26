@@ -1,5 +1,3 @@
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
 int _tmain() {
     // Initialize Winsock
     WSADATA wsaData = {};
@@ -49,18 +47,26 @@ int _tmain() {
     }
 
 
-char recv_buffer[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
-memset(recv_buffer, 0, sizeof(recv_buffer));  // initialize the buffer with zeroes
+// Declare a buffer to store the received screen data
+char buffer[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
 
-// Receive the screen data from the client
-int bytes_received = recv(clientSock, recv_buffer, sizeof(recv_buffer), 0);
-if (bytes_received == SOCKET_ERROR) {
-    std::cerr << "Failed to receive screen data: " << WSAGetLastError() << std::endl;
-    closesocket(clientSock);
-    closesocket(sock);
-    WSACleanup();
-    return 1;
+// Receive screen data from the client
+int received = 0;
+while (received < sizeof(buffer)) {
+    int result = recv(clientSock, buffer + received, sizeof(buffer) - received, 0);
+    if (result == SOCKET_ERROR) {
+        std::cout << "recv failed: " << WSAGetLastError() << std::endl;
+        closesocket(clientSock);
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
+    received += result;
 }
+
+
+
+
 
 
     // Register a window class for the window that will display the received screen data
@@ -75,7 +81,7 @@ if (bytes_received == SOCKET_ERROR) {
     wc.lpszClassName = "WindowClass";
     RegisterClassEx(&wc);
 
-HWND hWnd = CreateWindowEx(
+	HWND hWnd = CreateWindowEx(
     WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
     "WindowClass",
     "Remote Screen",
@@ -90,21 +96,28 @@ if (hWnd == NULL) {
     return 1;
 }
 
-// Set up a device context for the server-side window
-HDC hdc = GetDC(hWnd);
+
+
+	// Set up a device context for the server-side window
+	HDC hdc = GetDC(hWnd);
+
+
 
 // Iterate over the received screen data and set the pixel color on the server-side window
 for (int y = 0; y < SCREEN_HEIGHT; y++) {
     HDC hdc = GetDC(hWnd); // define hdc inside the loop
     for (int x = 0; x < SCREEN_WIDTH; x++) {
         int i = (y * SCREEN_WIDTH + x) * 3;
-        BYTE b = (BYTE)recv_buffer[i];
-        BYTE g = (BYTE)recv_buffer[i+1];
-        BYTE r = (BYTE)recv_buffer[i+2];
+        BYTE b = (BYTE)buffer[i];
+        BYTE g = (BYTE)buffer[i+1];
+        BYTE r = (BYTE)buffer[i+2];
         SetPixel(hdc, x, y, RGB(r, g, b));
     }
     //ReleaseDC(hWnd, hdc); // release hdc after the inner loop
 }
+
+
+
 
 // Release the device context
 ReleaseDC(hWnd, hdc);
@@ -118,7 +131,7 @@ ShowWindow(hWnd, SW_SHOW);
 
 
 // Receive screen data from the client
-std::vector<char> buffer(BUF_SIZE);
+//std::vector<char> buffer(BUF_SIZE);
 int bytesReceived = 0;
 int totalBytesReceived = 0;
 do {
@@ -157,18 +170,5 @@ DeleteObject(hBitmap);
 closesocket(clientSock);
 closesocket(sock);
 WSACleanup();
-return 0;
-}
-
-
-// Window procedure for the window that will display the received screen data
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-switch (message) {
-case WM_DESTROY:
-PostQuitMessage(0);
-break;
-default:
-return DefWindowProc(hWnd, message, wParam, lParam);
-}
 return 0;
 }
