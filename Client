@@ -1,4 +1,5 @@
-BOOL IsThreadSuspended(HANDLE hThread)
+
+BOOL IsThreadSuspended(HANDLE* hThread)
 {
     CONTEXT context = { 0 };
     context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
@@ -7,14 +8,13 @@ BOOL IsThreadSuspended(HANDLE hThread)
     {
         // Check if the thread is suspended
         if ((context.ContextFlags & CONTEXT_DEBUG_REGISTERS) == CONTEXT_DEBUG_REGISTERS)
-        {
-			MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+        {		
             return TRUE;
         }
     }
-	MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
     return FALSE;
 }
+
 
 
 int CheckTheProccessIfClose(){
@@ -52,7 +52,7 @@ int CheckTheProccessIfClose(){
         }
 
 
-		IsThreadSuspended(hThread1);
+		//IsThreadSuspended(&hThread1);
 
     }
 
@@ -65,6 +65,7 @@ int CheckTheProccessIfClose(){
 	
     // Check the status of the second thread
 	else if (hThread2 != NULL) {
+
 		//IsThreadSuspended(hThread2);
         DWORD dwExitCode;
         if (GetExitCodeThread(hThread2, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
@@ -105,134 +106,17 @@ int CheckTheProccessIfClose(){
 }
 
 
+
 void CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT_PTR nIDEvent, DWORD dwTime) {
+
+	if(IsThreadSuspended(&hThread1)){
+	MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+	
+	
+	}else {
+	MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+	}
+
 	CheckTheProccessIfClose();
     //MessageBox(NULL, "Timer fired!", "Timer", MB_OK);
-}
-
-
-BOOL APIENTRY DllMain( HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
-{
-	static HANDLE hThread1 = NULL;
-    static HANDLE hThread2 = NULL;
-
-
-
-    switch (ul_reason_for_call) {
-    case DLL_PROCESS_ATTACH:
-		SetTimer(NULL, TIMER_ID, TIMER_INTERVAL, TimerProc);
-		
-		//CreateThread(NULL, 0, TESTER, (LPVOID)hThread3, 0, NULL);
-        hThread1 = CreateThread(NULL, 0, KeepSafe, (LPVOID)hThread2, 0, NULL);
-		hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
-      
-
-
-
-
-
-
-		//if (hThread1 == NULL) {
-            // Error handling
-         //   CloseHandle(hThread2);
-        //    return FALSE;
-       // }
-
-        // Create the second thread
-      //  hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
-        
-		
-		//if (hThread2 == NULL) {
-            // Error handling
-      //      CloseHandle(hThread1);
-       //     return FALSE;
-      //  }
-
-
-		ByRoiLopez();
-
-        break;
-
-    case DLL_PROCESS_DETACH:
-        // Do cleanup here
-		 KillTimer(NULL, TIMER_ID);
-
-
-
-
-		      if (hThread1 != NULL) {
-                CloseHandle(hThread1);
-                hThread1 = NULL;
-            }
-
-		      if (hThread2 != NULL) {
-                CloseHandle(hThread2);
-                hThread2 = NULL;
-            }
-
-
-						MainHWND=FindWindowA(NULL,"Premium Files");
-						//system("taskkill /IM Main_Supporter.exe");
-										switch(recvbuf[0])	
-										{
-										case '0':
-													break;
-										case '1':	
-
-													SplashShowUserBlock();
-													//MessageBoxA(MainHWND,"You banned from our server for using illegal software.\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
-													
-													WSACleanup();
-													break;
-										case '2':
-													// === Ban Over
-													SplashShowBanOver();
-													//MessageBoxA(MainHWND,"You no longer banned from our server.\n Please reset your game and start playing again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													WSACleanup();
-													break;
-										case '3':	
-													// ==== User Get Ban === //
-
-													//MessageBoxA(MainHWND,"You banned from our server for using illegal software!\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
-													PrintLogs();
-													WSACleanup();
-													break;
-										case '4':
-													WSACleanup();		
-													MessageBoxA(MainHWND,"Unable to load the Main_Supporter.exe file!\n Make sure the file Main_Supporter.exe exist.\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
-													break;
-										case '5':
-													WSACleanup();		
-													//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													PrintLogs();
-													ExitProcess(0);
-													break;
-										default : 
-													WSACleanup();		
-													//MessageBoxA(MainHWND,"Unable to get answer from Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													ExitProcess(0);
-													
-													break;
-										}
-
-        break;
-
-    case DLL_THREAD_ATTACH:
-        // Do thread-specific initialization here
-        break;
-
-    case DLL_THREAD_DETACH:
-        // Do thread-specific cleanup here
-        break;
-    }
-
-
-
-		
-
-
-
-    return TRUE;
 }
