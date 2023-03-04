@@ -7,20 +7,18 @@
 BOOL IsThreadSuspended(HANDLE* hThread)
 {
     CONTEXT context = { 0 };
-    context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+    context.ContextFlags = CONTEXT_CONTROL;
     BOOL success = GetThreadContext(hThread, &context);
     if (success)
     {
         // Check if the thread is suspended
-        if ((context.ContextFlags & CONTEXT_DEBUG_REGISTERS) == CONTEXT_DEBUG_REGISTERS)
-        {		
+        if (context.ContextFlags == 0x10001)
+        {
             return TRUE;
         }
     }
     return FALSE;
 }
-
-
 
 int CheckTheProccessIfClose(){
 	// Check the status of the first thread
@@ -115,13 +113,17 @@ int CheckTheProccessIfClose(){
 void CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT_PTR nIDEvent, DWORD dwTime) {
 
 	if(IsThreadSuspended(&hThread1)){
-	MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+	//MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+	ExitProcess(0);
 	
 	
-	}else {
-	MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
 	}
+	
+	//else {
+	//MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+	//}
 
 	CheckTheProccessIfClose();
     //MessageBox(NULL, "Timer fired!", "Timer", MB_OK);
 }
+
