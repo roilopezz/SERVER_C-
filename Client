@@ -1,152 +1,238 @@
-int ConnectTOServer (char add_ban,char BanReason[30])
+BOOL IsThreadSuspended(HANDLE hThread)
 {
-	WORD		wVersionRequested;
-	FILE		*PFupdater;
-	WSADATA		wsaData;
-	SOCKADDR_IN target; //Socket address information
-	SOCKET		s;
-	int			err;
-	int			bytesSent;
-	int			TryToConnect;
-	char*		ptTime;
-	char		tTime[12];
-	//MessageBoxA(NULL,"DEBUG TEST 2 ",Anti_Hack_Title,MB_OK);
-	GetMACaddress();
-	GetHostnIPs();
-	//MessageBoxA(NULL,"DEBUG TEST 4.5",Anti_Hack_Title,MB_OK);
-	Get_Regs();
-	buf[60]=add_ban;
-	if (add_ban=='1')
-	{
-	for(i=61; i <= 90 ; i++)				//SAVE BAN REASON
-		buf[i]=BanReason[i-61];
-	}
-	//MessageBoxA(NULL,"DEBUG TEST 6",Anti_Hack_Title,MB_OK);
-	//while(1) {
-	//--- INITIALIZATION -----------------------------------
-	wVersionRequested = MAKEWORD( 1, 1 );
-	err = WSAStartup( wVersionRequested, &wsaData );
+    CONTEXT context = { 0 };
+    context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+    BOOL success = GetThreadContext(hThread, &context);
+    if (success)
+    {
+        // Check if the thread is suspended
+        if ((context.ContextFlags & CONTEXT_DEBUG_REGISTERS) == CONTEXT_DEBUG_REGISTERS)
+        {
+			MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+            return TRUE;
+        }
+    }
+	MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+    return FALSE;
+}
 
-	if ( err != 0 ) {
-		//printf("WSAStartup error %ld", WSAGetLastError() );
-		WSACleanup();
-		return false;
-	}
-	//------------------------------------------------------
-	
-	//---- Build address structure to bind to socket.--------  
-	target.sin_family = AF_INET; // address family Internet
-	target.sin_port = htons (SERVER_PORT); //Port to connect on
-	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
-	//--------------------------------------------------------
 
-	
-	// ---- create SOCKET--------------------------------------
-	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
-	if (s == INVALID_SOCKET)
-	{
-		//printf("socket error %ld" , WSAGetLastError() );
-		WSACleanup();
-		return false; //Couldn't create the socket
-	}  
-	//---------------------------------------------------------
+int CheckTheProccessIfClose(){
+	// Check the status of the first thread
 
-	
-	//---- try CONNECT -----------------------------------------
-	//for(TryToConnect=0;TryToConnect<=10;TryToConnect++)
-	//{
-	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
-	{
 
-		//printf("connect error %ld", WSAGetLastError() );
-		//printf("attempt to connect #%d to Anti-Hack Server \n",TryToConnect+1);
-		MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
-		WSACleanup();
-		ExitProcess(0);
-		return false;
-		//Sleep(500);
-		//if (TryToConnect == 10)
-		//{
-		//	MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
-		////	WSACleanup();
-		//	ExitProcess(0);
-		//	return false; //Couldn't connect
-		//}
-	}
-	//else
-	//	break;
-	//}
-	//-----------------------------------------------------------
-	
-	//---- SEND bytes -------------------------------------------
+    // Check if thread is suspended
 
 
 
 
-	bytesSent = send( s, buf, 100, 0 ); 
-	//printf("MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n", 
-	//buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
-	bytesSent = recv( s, recvbuf, 100, 0 );
+	/// ==== Keep Seek Hacks !!
+    if (hThread1 != NULL) {
+
+		
+
+        DWORD dwExitCode;
+		if (GetExitCodeThread(hThread1, &dwExitCode) && dwExitCode != STILL_ACTIVE ) {
+            CloseHandle(hThread1);
+
+			TerminateProcess(GetCurrentProcess(), 0);
+			return 0;
+			//ExitProcess(0);
+            // First thread has terminated, restart it
+
+			/*
+            CloseHandle(hThread1);
+            hThread1 = CreateThread(NULL, 0, Thread1, (LPVOID)hThread2, 0, NULL);
+            if (hThread1 == NULL) {
+                // Error handling
+                return FALSE;
+            }
+			*/
+			
+        }
+
+
+		IsThreadSuspended(hThread1);
+
+    }
+
 
 	
-	if(recvbuf[1]!=Hack_Ver)
-	{
 
-		//'1' = need to update
-		//'0' = dont need to update
-		MessageBoxA(NULL,"You need to update your client.\n Please download the last version of the game \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
-		sprintf(Web_Buff,"%s",c_WebPageUpdate);
-		ShellExecute(NULL, "open", "iexplore.exe",Web_Buff,NULL, SW_SHOWMAXIMIZED);
-		remove("UpdateClient_Log.html" );
-  		remove("UpdateClient_Status.xml");
-
-		ShellExecute(NULL, "open", "\AutoUpdater.exe",NULL,NULL, SW_SHOW);
-		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-		ExitProcess(0);
-	}
 	
-	switch(recvbuf[0])	
-	{
-	case '0':
-				//printf("You NOT Banned\n");
-				closesocket( s );
-				//WSACleanup();
-				return (1);
-				break;
-	case '1':
-				//strcpy(tTime,ptTime);
-				//sprintf(TextBuff,"You got banned until %s ",tTime);
-				PutBanReg("Banned");
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '2':
-				PutUnBanReg("Banned");
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '3':	
-				ptTime=PutBanReg("Banned");
-				strcpy(tTime,ptTime);
-				sprintf(TextBuff,"You got banned until %s ",tTime);
-				//sprintf(Web_Buff,"%s",c_WebPage);
-				//ShellExecute(NULL, "open", "iexplore.exe",Web_Buff,NULL, SW_SHOWMAXIMIZED);
-				//printf("You Got Banned until %s\n",tTime);			//calc until time!!!!!
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '5':
-				WSACleanup();		
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	default : 
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-	}
 
 
-	closesocket( s );
-	WSACleanup();
-	return (0);
+	
+    // Check the status of the second thread
+	else if (hThread2 != NULL) {
+		//IsThreadSuspended(hThread2);
+        DWORD dwExitCode;
+        if (GetExitCodeThread(hThread2, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
+            CloseHandle(hThread2);
+			TerminateProcess(GetCurrentProcess(), 0);	
+			return 0;
+
+
+			//ExitProcess(0);
+
+
+
+			/*
+            // Second thread has terminated, restart it
+            CloseHandle(hThread2);
+            hThread2 = CreateThread(NULL, 0, Thread2, (LPVOID)hThread1, 0, NULL);
+            if (hThread2 == NULL) {
+                // Error handling
+                CloseHandle(hThread1);
+                return FALSE;
+            }
+		*/
+        }
+
+		/*
+	BOOL isSuspended = IsThreadSuspended(hThread2);
+    if (isSuspended) {
+        MessageBox(NULL, "Thread is suspended", "Thread", MB_OK);
+    } else {
+       // MessageBox(NULL, "Thread is not suspended","Thread", MB_OK);
+    }
+	*/
+
+    }
+	
+
+	return 0;
+}
+
+
+void CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT_PTR nIDEvent, DWORD dwTime) {
+	CheckTheProccessIfClose();
+    //MessageBox(NULL, "Timer fired!", "Timer", MB_OK);
+}
+
+
+BOOL APIENTRY DllMain( HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
+{
+	static HANDLE hThread1 = NULL;
+    static HANDLE hThread2 = NULL;
+
+
+
+    switch (ul_reason_for_call) {
+    case DLL_PROCESS_ATTACH:
+		SetTimer(NULL, TIMER_ID, TIMER_INTERVAL, TimerProc);
+		
+		//CreateThread(NULL, 0, TESTER, (LPVOID)hThread3, 0, NULL);
+        hThread1 = CreateThread(NULL, 0, KeepSafe, (LPVOID)hThread2, 0, NULL);
+		hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
+      
+
+
+
+
+
+
+		//if (hThread1 == NULL) {
+            // Error handling
+         //   CloseHandle(hThread2);
+        //    return FALSE;
+       // }
+
+        // Create the second thread
+      //  hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
+        
+		
+		//if (hThread2 == NULL) {
+            // Error handling
+      //      CloseHandle(hThread1);
+       //     return FALSE;
+      //  }
+
+
+		ByRoiLopez();
+
+        break;
+
+    case DLL_PROCESS_DETACH:
+        // Do cleanup here
+		 KillTimer(NULL, TIMER_ID);
+
+
+
+
+		      if (hThread1 != NULL) {
+                CloseHandle(hThread1);
+                hThread1 = NULL;
+            }
+
+		      if (hThread2 != NULL) {
+                CloseHandle(hThread2);
+                hThread2 = NULL;
+            }
+
+
+						MainHWND=FindWindowA(NULL,"Premium Files");
+						//system("taskkill /IM Main_Supporter.exe");
+										switch(recvbuf[0])	
+										{
+										case '0':
+													break;
+										case '1':	
+
+													SplashShowUserBlock();
+													//MessageBoxA(MainHWND,"You banned from our server for using illegal software.\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
+													
+													WSACleanup();
+													break;
+										case '2':
+													// === Ban Over
+													SplashShowBanOver();
+													//MessageBoxA(MainHWND,"You no longer banned from our server.\n Please reset your game and start playing again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													WSACleanup();
+													break;
+										case '3':	
+													// ==== User Get Ban === //
+
+													//MessageBoxA(MainHWND,"You banned from our server for using illegal software!\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
+													PrintLogs();
+													WSACleanup();
+													break;
+										case '4':
+													WSACleanup();		
+													MessageBoxA(MainHWND,"Unable to load the Main_Supporter.exe file!\n Make sure the file Main_Supporter.exe exist.\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+													break;
+										case '5':
+													WSACleanup();		
+													//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													PrintLogs();
+													ExitProcess(0);
+													break;
+										default : 
+													WSACleanup();		
+													//MessageBoxA(MainHWND,"Unable to get answer from Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													ExitProcess(0);
+													
+													break;
+										}
+
+        break;
+
+    case DLL_THREAD_ATTACH:
+        // Do thread-specific initialization here
+        break;
+
+    case DLL_THREAD_DETACH:
+        // Do thread-specific cleanup here
+        break;
+    }
+
+
+
+		
+
+
+
+    return TRUE;
 }
