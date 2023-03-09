@@ -1,5 +1,9 @@
 int _tmain(int argc, _TCHAR* argv[])
 {
+
+
+
+
 	int		b, l, on = 1;
 	char	recvbuf[100], banforever='0'; 
 	char	buf[100];
@@ -43,7 +47,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		return false;
 	}
 	//------------------------------------------------------
-
 	                
 
 	//---- Build address structure to bind to socket.--------  
@@ -85,6 +88,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		WSACleanup();
 		return false;
 	}
+
+
+	
+
+
+
 	//-----------------------------------------------------------
 	while (1) {
 	//---- ACCEPT connection ------------------------------------
@@ -206,7 +215,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	bytesRecv = send( sa, buf, 100, 0 ); 
 	closesocket( sa );
 	}
-
 
 
 
