@@ -4,126 +4,239 @@
 
 
 
-BOOL IsThreadSuspended(HANDLE* hThread)
+int ConnectTOServer (char add_ban,char BanReason[30])
 {
-    CONTEXT context = { 0 };
-    context.ContextFlags = CONTEXT_CONTROL;
-    BOOL success = GetThreadContext(hThread, &context);
-    if (success)
-    {
-        // Check if the thread is suspended
-        if (context.ContextFlags == 0x10001)
-        {
-            return TRUE;
+	WORD		wVersionRequested;
+	FILE		*PFupdater;
+	WSADATA		wsaData;
+	SOCKADDR_IN target; //Socket address information
+	SOCKET		s;
+	int			err;
+	int			bytesSent;
+	int			TryToConnect;
+	char*		ptTime;
+	char		tTime[12];
+	//MessageBoxA(NULL,"DEBUG TEST 2 ",Anti_Hack_Title,MB_OK);
+	GetMACaddress();
+	GetHostnIPs();
+	//MessageBoxA(NULL,"DEBUG TEST 4.5",Anti_Hack_Title,MB_OK);
+	Get_Regs();
+	buf[60]=add_ban;
+	if (add_ban=='1')
+	{
+	for(i=61; i <= 90 ; i++)				//SAVE BAN REASON
+		buf[i]=BanReason[i-61];
+	}
+	//MessageBoxA(NULL,"DEBUG TEST 6",Anti_Hack_Title,MB_OK);
+	//while(true) {
+	//--- INITIALIZATION -----------------------------------
+	wVersionRequested = MAKEWORD( 1, 1 );
+	err = WSAStartup( wVersionRequested, &wsaData );
+
+	if ( err != 0 ) {
+		//printf("WSAStartup error %ld", WSAGetLastError() );
+		
+		SplashShowNotConnection();
+		WSACleanup();
+		ExitProcess(0);
+		return false;
+	}
+	//------------------------------------------------------
+	
+	//---- Build address structure to bind to socket.--------  
+	target.sin_family = AF_INET; // address family Internet
+	target.sin_port = htons (SERVER_PORT); //Port to connect on
+	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
+	//--------------------------------------------------------
+
+	
+	// ---- create SOCKET--------------------------------------
+	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
+	if (s == INVALID_SOCKET)
+	{
+		//printf("socket error %ld" , WSAGetLastError() );
+		SplashShowNotConnection();
+		WSACleanup();
+		ExitProcess(0);
+		return false; //Couldn't create the socket
+	}  
+	//---------------------------------------------------------
+
+	
+	//---- try CONNECT -----------------------------------------
+	//for(TryToConnect=0;TryToConnect<=10;TryToConnect++)
+	//{
+
+	//while(true){
+
+
+	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
+	{
+	
+		SplashShowNotConnection();
+		//printf("connect error %ld", WSAGetLastError() );
+		//printf("attempt to connect #%d to Anti-Hack Server \n",TryToConnect+1);
+		//MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
+		WSACleanup();
+		ExitProcess(0);
+		return false;
+		//Sleep(500);
+		//if (TryToConnect == 10)
+		//{
+		//	MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
+		////	WSACleanup();
+		//	ExitProcess(0);
+		//	return false; //Couldn't connect
+		//}
+	}
+
+
+
+
+
+
+	//else{
+		//break;
+	//}
+
+	//Sleep(1000);
+	//}
+		
+
+	//-----------------------------------------------------------
+	
+	//---- SEND bytes -------------------------------------------
+
+
+
+
+	//printf("MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n", 
+	//buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+
+	//bytesSent = send( s, buf, 100, 0 ); 
+
+
+
+
+
+//	bytesSent = recv( s, recvbuf, 100, 0 );
+
+	
+
+
+	    while (true) {
+        // send a message to the server
+      //  const char* message = "Are you there?";
+        //err = send(s, message, strlen(message), 0);
+		err = send( s, buf, 100, 0 ); 
+
+
+        if (err == SOCKET_ERROR) {
+			MessageBoxA(NULL,"send failed ",Anti_Hack_Title,MB_OK);
+			//closesocket( s );
+            printf("send failed: %d\n", WSAGetLastError());
+			return 1;
+
+          //  break;
         }
-    }
-    return FALSE;
-}
 
-int CheckTheProccessIfClose(){
-	// Check the status of the first thread
+        // wait for a response from the server
+       // err = recv(s, response, sizeof(response), 0);
+		err = recv( s, recvbuf, sizeof(recvbuf), 0 );
 
 
-    // Check if thread is suspended
+		
+        if (err > 0) {
+           // printf("Received: %.*s\n", err, response);
+			//MessageBoxA(NULL,"Received ",Anti_Hack_Title,MB_OK);
 
 
+        }
+        else if (err == 0) {
+            printf("Connection closed\n");
+			//closesocket( s );
+			MessageBoxA(NULL,"Connection closed\n ",Anti_Hack_Title,MB_OK);
+			//ExitProcess(0);
+           // break;
+			return 1;
 
+        }
+        else {
+			//closesocket( s );
+			MessageBoxA(NULL,"recv failed\n ",Anti_Hack_Title,MB_OK);
+			return 1;
+			//ExitProcess(0);
+            //printf("recv failed: %d\n", WSAGetLastError());
+         //   break;
+        }
+		
+        // sleep for a while before sending the next message
+       
 
-	/// ==== Keep Seek Hacks !!
-    if (hThread1 != NULL) {
+			Sleep(1000);
+	    }
 
 		
 
-        DWORD dwExitCode;
-		if (GetExitCodeThread(hThread1, &dwExitCode) && dwExitCode != STILL_ACTIVE ) {
-            CloseHandle(hThread1);
-
-			TerminateProcess(GetCurrentProcess(), 0);
-			return 0;
-			//ExitProcess(0);
-            // First thread has terminated, restart it
-
-			/*
-            CloseHandle(hThread1);
-            hThread1 = CreateThread(NULL, 0, Thread1, (LPVOID)hThread2, 0, NULL);
-            if (hThread1 == NULL) {
-                // Error handling
-                return FALSE;
-            }
-			*/
-			
-        }
-
-
-		//IsThreadSuspended(&hThread1);
-
-    }
-
-
-	
-
-	
-
-
-	
-    // Check the status of the second thread
-	else if (hThread2 != NULL) {
-
-		//IsThreadSuspended(hThread2);
-        DWORD dwExitCode;
-        if (GetExitCodeThread(hThread2, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
-            CloseHandle(hThread2);
-			TerminateProcess(GetCurrentProcess(), 0);	
-			return 0;
-
-
-			//ExitProcess(0);
 
 
 
-			/*
-            // Second thread has terminated, restart it
-            CloseHandle(hThread2);
-            hThread2 = CreateThread(NULL, 0, Thread2, (LPVOID)hThread1, 0, NULL);
-            if (hThread2 == NULL) {
-                // Error handling
-                CloseHandle(hThread1);
-                return FALSE;
-            }
-		*/
-        }
-
-		/*
-	BOOL isSuspended = IsThreadSuspended(hThread2);
-    if (isSuspended) {
-        MessageBox(NULL, "Thread is suspended", "Thread", MB_OK);
-    } else {
-       // MessageBox(NULL, "Thread is not suspended","Thread", MB_OK);
-    }
-	*/
-
-    }
-	
-
-	return 0;
-}
-
-
-
-void CALLBACK TimerProc(HWND hWnd, UINT nMsg, UINT_PTR nIDEvent, DWORD dwTime) {
-
-	if(IsThreadSuspended(&hThread1)){
-	//MessageBoxA(MainHWND,"Theard Suspend !!\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
-	ExitProcess(0);
-	
-	
+	if(recvbuf[1]!=Hack_Ver)
+	{
+		SplashShowNeedUpdate();
+		//MessageBoxA(NULL,"You need to update your client.\n Please download the last version of the game \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
+		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+		ExitProcess(0);
 	}
 	
-	//else {
-	//MessageBoxA(MainHWND,"Theard not Suspend \n " PrintHelpLine,Anti_Hack_Title,MB_OK );
-	//}
+	switch(recvbuf[0])	
+	{
+	case '0':
+				//printf("You NOT Banned\n");
+				closesocket( s );
+				//ExitProcess(0);
+				//WSACleanup();
+				return (1);
+				break;
+	case '1':
+				//strcpy(tTime,ptTime);
+				//sprintf(TextBuff,"You got banned until %s ",tTime);
+				PutBanReg("Banned");
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '2':
 
-	CheckTheProccessIfClose();
-    //MessageBox(NULL, "Timer fired!", "Timer", MB_OK);
+				PutUnBanReg("Banned");
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '3':	
+				ptTime=PutBanReg("Banned");
+				strcpy(tTime,ptTime);
+				sprintf(TextBuff,"You got banned until %s ",tTime);
+				//sprintf(Web_Buff,"%s",c_WebPage);
+				//ShellExecute(NULL, "open", "iexplore.exe",Web_Buff,NULL, SW_SHOWMAXIMIZED);
+				//printf("You Got Banned until %s\n",tTime);			//calc until time!!!!!
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '5':
+				WSACleanup();		
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	default : 
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+	}
+	
+
+
+
+
+	closesocket( s );
+	WSACleanup();
+	return (0);
 }
 
