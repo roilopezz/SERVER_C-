@@ -1,5 +1,48 @@
+
+DWORD WINAPI sendHeartbeats(LPVOID lpParam)
+{
+	//hThread3 = (HANDLE)lpParam;
+    heartbeatSocket = (SOCKET)lpParam;
+
+    while (true) {
+        // Send a heartbeat message to the heartbeat server
+        std::string heartbeatMessage = "heartbeat";
+        int result = send(heartbeatSocket, heartbeatMessage.c_str(), heartbeatMessage.length(), 0);
+       
+		if (result == SOCKET_ERROR) {
+        
+			SplashShowNotConnection();
+			ExitProcess(0);
+            closesocket(heartbeatSocket);
+            return 1;
+        }
+
+
+
+
+
+
+
+
+
+
+		//CloseHandle(hThread1);
+		//CloseHandle(hThread2);
+        Sleep(1000); // Wait for 1 second before sending the next heartbeat message
+		//return 0;
+    }
+
+
+		//CloseHandle(hThread1);
+		//CloseHandle(hThread2);
+
+    return 0;
+}
+
+
 int ConnectTOServer (char add_ban,char BanReason[30])
 {
+	
 	WORD		wVersionRequested;
 	FILE		*PFupdater;
 	WSADATA		wsaData;
@@ -10,386 +53,136 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 	int			TryToConnect;
 	char*		ptTime;
 	char		tTime[12];
-	//MessageBoxA(NULL,"DEBUG TEST 2 ",Anti_Hack_Title,MB_OK);
-	GetMACaddress();
-	GetHostnIPs();
-	//MessageBoxA(NULL,"DEBUG TEST 4.5",Anti_Hack_Title,MB_OK);
-	Get_Regs();
-	buf[60]=add_ban;
-	if (add_ban=='1')
-	{
-	for(i=61; i <= 90 ; i++)				//SAVE BAN REASON
-		buf[i]=BanReason[i-61];
-	}
-	//MessageBoxA(NULL,"DEBUG TEST 6",Anti_Hack_Title,MB_OK);
-	//while(1) {
-	//--- INITIALIZATION -----------------------------------
-	wVersionRequested = MAKEWORD( 1, 1 );
-	err = WSAStartup( wVersionRequested, &wsaData );
 
-	if ( err != 0 ) {
-		//printf("WSAStartup error %ld", WSAGetLastError() );
-		WSACleanup();
-		return false;
-	}
-	//------------------------------------------------------
-	
-	//---- Build address structure to bind to socket.--------  
-	target.sin_family = AF_INET; // address family Internet
-	target.sin_port = htons (SERVER_PORT); //Port to connect on
-	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
-	//--------------------------------------------------------
+
+
+	//// ================ Heart Beat Server ================ //
+	// Initialize Winsock
+   // WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0) {
+        std::cerr << "WSAStartup failed with error: " << result << std::endl;
+        return 1;
+    }
+
+    // Create a socket for the heartbeat server
+    SOCKET heartbeatSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (heartbeatSocket == INVALID_SOCKET) {
+        std::cerr << "Failed to create socket with error: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        return 1;
+    }
+
+
+    // Resolve the IP address and port of the heartbeat server
+    sockaddr_in heartbeatAddress;
+    heartbeatAddress.sin_family = AF_INET;
+	heartbeatAddress.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
+    heartbeatAddress.sin_port = htons(HEARTBeat_PORT);
 
 	
-	// ---- create SOCKET--------------------------------------
-	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
-	if (s == INVALID_SOCKET)
-	{
-		//printf("socket error %ld" , WSAGetLastError() );
-		WSACleanup();
-		return false; //Couldn't create the socket
-	}  
-	//---------------------------------------------------------
 
-	
-	//---- try CONNECT -----------------------------------------
-	//for(TryToConnect=0;TryToConnect<=10;TryToConnect++)
-	//{
-
-	//while(true){
+    result = connect(heartbeatSocket, (SOCKADDR*)&heartbeatAddress, sizeof(heartbeatAddress));
+    if (result == SOCKET_ERROR) {
+       // std::cerr << "Failed to connect to heartbeat server with error: " << WSAGetLastError() << std::endl;
+       // closesocket(heartbeatSocket);
+       // WSACleanup();
 
 
-	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
-	{
-	
 		SplashShowNotConnection();
-		//printf("connect error %ld", WSAGetLastError() );
-		//printf("attempt to connect #%d to Anti-Hack Server \n",TryToConnect+1);
-		//MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
 		WSACleanup();
 		ExitProcess(0);
-		return false;
-		//Sleep(500);
-		//if (TryToConnect == 10)
-		//{
-		//	MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
-		////	WSACleanup();
-		//	ExitProcess(0);
-		//	return false; //Couldn't connect
-		//}
-	}
-	//else
-	//	break;
-	//}
 
-	//Sleep(1000);
-	//}
+        return 1;
+    }
+
+    std::cout << "Connected to heartbeat server" << std::endl;
+
+    // Create a thread to send heartbeat messages to the heartbeat server
+    HANDLE heartbeatThread = CreateThread(NULL, 0, sendHeartbeats, (LPVOID)heartbeatSocket, 0, NULL);
+    if (heartbeatThread == NULL) {
+        std::cerr << "Failed to create heartbeat thread with error: " << GetLastError() << std::endl;
+        closesocket(heartbeatSocket);
+        WSACleanup();
+        return 1;
+    }
 
 
-	//-----------------------------------------------------------
-	
-	//---- SEND bytes -------------------------------------------
-
-
-
-
-	//printf("MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n", 
-	//buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
-
-	bytesSent = send( s, buf, 100, 0 ); 
-	bytesSent = recv( s, recvbuf, 100, 0 );
-
-	
-	if(recvbuf[1]!=Hack_Ver)
-	{
-		SplashShowNeedUpdate();
-		//MessageBoxA(NULL,"You need to update your client.\n Please download the last version of the game \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
-		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-		ExitProcess(0);
-	}
-	
-	switch(recvbuf[0])	
-	{
-	case '0':
-				//printf("You NOT Banned\n");
-				closesocket( s );
-				//ExitProcess(0);
-				//WSACleanup();
-				return (1);
-				break;
-	case '1':
-				//strcpy(tTime,ptTime);
-				//sprintf(TextBuff,"You got banned until %s ",tTime);
-				PutBanReg("Banned");
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '2':
-
-				PutUnBanReg("Banned");
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '3':	
-				ptTime=PutBanReg("Banned");
-				strcpy(tTime,ptTime);
-				sprintf(TextBuff,"You got banned until %s ",tTime);
-				//sprintf(Web_Buff,"%s",c_WebPage);
-				//ShellExecute(NULL, "open", "iexplore.exe",Web_Buff,NULL, SW_SHOWMAXIMIZED);
-				//printf("You Got Banned until %s\n",tTime);			//calc until time!!!!!
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	case '5':
-				WSACleanup();		
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-				break;
-	default : 
-				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-				ExitProcess(0);
-	}
+	//// ================ END Heart Beat Server ================ //
 
 
 	closesocket( s );
 	WSACleanup();
+
+
 	return (0);
 }
 
 
-void StartUp (void) 
-{
+
+int CheckTheProccessIfClose(){
 
 
 
-
-	int ConnectDone,FoundHack,FoundChangeFiles,FoundTitle , TitleCheckWindowS;
-
-
-	/*
-#ifdef PREMU
-	if(FindWindow(NULL,"Launcher 1.2") == NULL)
-	{
-		MessageBoxA(NULL,"You Mast Open the Launcher!",Anti_Hack_Title,MB_OK);
-		ExitProcess(0);
-	}
-#endif
-	*/
-
-
-	//if (FindWindow("","Premium Files"))
-	//{
-	//	MessageBoxA(NULL,"Running MU twice is not allowed.\n"PrintHelpLine,Anti_Hack_Title,MB_OK);
-	//	ExitProcess(0);
-	//}
-
-	ConnectDone=ConnectTOServer('0',"");
-
-	if (ConnectDone == 1)
-	{
-		//MessageBoxA(NULL,"DEBUG TEST 7",Anti_Hack_Title,MB_OK);
-		//printf("Start Memory Scan\n");
-		//FoundChangeFiles=PlayerMapsCheck();
-
-
-		// Memory Scan
-		FoundHack=SystemProcessesScan();
-
-		// Found bad Words
-		FoundTitle=Scan_Titles();
-
-		// Title Windows
-		TitleCheckWindowS=TitleCheckWindow();
-
-		// == ScanTaskManager == //
-		ClasseCheckPross();
-		// == END ScanTaskManager == //
-
-		// Check Class Names //
-		ClasseCheckWindow();
-
-
-	if (FoundHack==1 || FoundTitle==1 || TitleCheckWindowS == 1)
-		{
-
-			if (FoundHack==1){
-				Ban_Reason[0]='1';			
-			}
-
-			if (FoundTitle==1){
-				Ban_Reason[0]='2';
-			}
-
-			if(TitleCheckWindowS == 1){
-				Ban_Reason[0]='5';						
-			}
-
-			CloseHandle(hThread1);
-			CloseHandle(hThread2);
-			ConnectTOServer('1',Ban_Reason);
-			DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-			
-			//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-			ExitProcess(0);
-		}
-
-
-
-
-		/*
-		if (FoundChangeFiles==2)
-		{
-			MessageBoxA(NULL,"The Anti-Hack system found that some of the file has modified or deleted.\n Please reinstall the game for playing! \n"PrintHelpLine,Anti_Hack_Title,MB_OK);
-			ExitProcess(0);
-		}
-		*/
-
-
-		/*
-		if (FoundHack==1 || FoundChangeFiles==1 || FoundTitle==1)
-		{
-
-			if (FoundTitle==1)
-				Ban_Reason[0]='2';
-			if (FoundChangeFiles==1)
-				Ban_Reason[0]='3';
-			if (FoundHack==1)
-				Ban_Reason[0]='1';
-			ConnectTOServer('1',Ban_Reason);
-			DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-			ExitProcess(0);
-		}
-		*/
-	//	else
-		//{
-			//ChangeSerial();
-			//MainProtect();
-			//DWORD MyId,My,titles;
-		//}
-	
-	}
-	else
-	{
-		//MessageBoxA(NULL,"Unable to connect to Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
-		ExitProcess(0);
-	}
-	
-}
-
-
-
-BOOL APIENTRY DllMain( HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
-{
-	static HANDLE hThread1 = NULL;
-    static HANDLE hThread2 = NULL;
-
-    switch (ul_reason_for_call) {
-    case DLL_PROCESS_ATTACH:
-		SetTimer(NULL, TIMER_ID, TIMER_INTERVAL, TimerProc);
-		
-		//CreateThread(NULL, 0, TESTER, (LPVOID)hThread3, 0, NULL);
-        hThread1 = CreateThread(NULL, 0, KeepSafe, (LPVOID)hThread2, 0, NULL);
-		hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
-      
-
-		if (hThread1 == NULL) {
-            // Error handling
-            CloseHandle(hThread2);
-            return FALSE;
-       }        
-		
-		if (hThread2 == NULL) {
-            // Error handling
+	/// ==== Keep Seek Hacks !!
+    if (hThread1 != NULL) {
+        DWORD dwExitCode;
+		if (GetExitCodeThread(hThread1, &dwExitCode) && dwExitCode != STILL_ACTIVE ) {
             CloseHandle(hThread1);
-            return FALSE;
-        }
+			TerminateProcess(GetCurrentProcess(), 0);
+			return 0;
+			//ExitProcess(0);
+            // First thread has terminated, restart it
 
-
-		ByRoiLopez();
-
-        break;
-
-    case DLL_PROCESS_DETACH:
-        // Do cleanup here
-		 KillTimer(NULL, TIMER_ID);
-
-
-
-
-		      if (hThread1 != NULL) {
-                CloseHandle(hThread1);
-                hThread1 = NULL;
+			/*
+            CloseHandle(hThread1);
+            hThread1 = CreateThread(NULL, 0, Thread1, (LPVOID)hThread2, 0, NULL);
+            if (hThread1 == NULL) {
+                // Error handling
+                return FALSE;
             }
+			*/
+			
+		}else{
+		 // Keep Elive The Theard for Suspend from hackers!
+		 ResumeThread(hThread1);
 
-		      if (hThread2 != NULL) {
-                CloseHandle(hThread2);
-                hThread2 = NULL;
-            }
-
-
-						MainHWND=FindWindowA(NULL,"Premium Files");
-						//system("taskkill /IM Main_Supporter.exe");
-										switch(recvbuf[0])	
-										{
-										case '0':
-													break;
-										case '1':	
-
-													SplashShowUserBlock();
-													//MessageBoxA(MainHWND,"You banned from our server for using illegal software.\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
-													
-				 									WSACleanup();
-													break;
-										case '2':
-													// === Ban Over
-													SplashShowBanOver();
-													//MessageBoxA(MainHWND,"You no longer banned from our server.\n Please reset your game and start playing again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													WSACleanup();
-													break;
-										case '3':	
-													// ==== User Get Ban === //
-
-													//MessageBoxA(MainHWND,"You banned from our server for using illegal software!\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
-													PrintLogs();
-													WSACleanup();
-													break;
-										case '4':
-													WSACleanup();		
-													MessageBoxA(MainHWND,"Unable to load the Main_Supporter.exe file!\n Make sure the file Main_Supporter.exe exist.\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
-													break;
-										case '5':
-													WSACleanup();		
-													//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													PrintLogs();
-													ExitProcess(0);
-													break;
-										default : 
-													WSACleanup();		
-													//MessageBoxA(MainHWND,"Unable to get answer from Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
-													ExitProcess(0);
-													
-													break;
-										}
-
-        break;
-
-    case DLL_THREAD_ATTACH:
-        // Do thread-specific initialization here
-        break;
-
-    case DLL_THREAD_DETACH:
-        // Do thread-specific cleanup here
-        break;
+		}
     }
 
+	//sendHeartbeats
+    // Check the status of the second thread
+	if (hThread2 != NULL) {
+        DWORD dwExitCode;
+        if (GetExitCodeThread(hThread2, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
+            CloseHandle(hThread2);
+			TerminateProcess(GetCurrentProcess(), 0);	
+			return 0;
 
 
-		
+			//ExitProcess(0);
 
 
 
-    return TRUE;
+			/*
+            // Second thread has terminated, restart it
+            CloseHandle(hThread2);
+            hThread2 = CreateThread(NULL, 0, Thread2, (LPVOID)hThread1, 0, NULL);
+            if (hThread2 == NULL) {
+                // Error handling
+                CloseHandle(hThread1);
+                return FALSE;
+            }
+		*/
+        }else{
+		 // Keep Elive The Theard for Suspend from hackers!
+		 ResumeThread(hThread2);
+
+		}
+
+
+    }
+	
+
+	return 0;
 }
