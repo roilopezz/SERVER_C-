@@ -1,44 +1,55 @@
+// Global variables
+HANDLE hThread1 = NULL;
+HANDLE hThread2 = NULL;
+HANDLE hThread3 = NULL;
+HANDLE hThread4 = NULL;
 
-DWORD WINAPI sendHeartbeats(LPVOID lpParam)
-{
+struct ThreadParams {
+    SOCKET heartbeatSocket;
+    HANDLE hThread3;
+};
+
+DWORD WINAPI sendHeartbeats(LPVOID lpParam){
 	//hThread3 = (HANDLE)lpParam;
-    heartbeatSocket = (SOCKET)lpParam;
+    //heartbeatSocket = (SOCKET)lpParam;
+
+	ThreadParams* params = (ThreadParams*)lpParam;
+    SOCKET heartbeatSocket = params->heartbeatSocket;
+    hThread3 = params->hThread3;
 
     while (true) {
+        Sleep(1000); // Wait for 1 second before sending the next heartbeat message
+
         // Send a heartbeat message to the heartbeat server
         std::string heartbeatMessage = "heartbeat";
-        int result = send(heartbeatSocket, heartbeatMessage.c_str(), heartbeatMessage.length(), 0);
-       
-		if (result == SOCKET_ERROR) {
-        
-			SplashShowNotConnection();
-			ExitProcess(0);
-            closesocket(heartbeatSocket);
-            return 1;
+        if (heartbeatSocket == INVALID_SOCKET) {
+            printf("Error: heartbeatSocket is not a valid socket.\n");
+            MessageBoxA(NULL,"Error: heartbeatSocket is not a valid socket.\n",Anti_Hack_Title,MB_OK);
+        } else {
+            int result = send(heartbeatSocket, heartbeatMessage.c_str(), heartbeatMessage.length(), 0);
+            if (result == SOCKET_ERROR) {
+                int errorCode = WSAGetLastError();
+                LPSTR errorMessage = NULL;
+                FormatMessageA(
+                    FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                    NULL,
+                    errorCode,
+                    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                    (LPSTR)&errorMessage,
+                    0,
+                    NULL
+                );
+                printf("send failed with error %d: %s\n", errorCode, errorMessage);
+                LocalFree(errorMessage);
+                MessageBoxA(NULL,errorMessage,Anti_Hack_Title,MB_OK);
+            }
         }
-
-
-
-
-
-
-
-
-
-
-		//CloseHandle(hThread1);
-		//CloseHandle(hThread2);
-        Sleep(1000); // Wait for 1 second before sending the next heartbeat message
-		//return 0;
     }
 
-
-		//CloseHandle(hThread1);
-		//CloseHandle(hThread2);
-
+    // This code should be outside of the while loop
+    closesocket(heartbeatSocket);
     return 0;
 }
-
 
 int ConnectTOServer (char add_ban,char BanReason[30])
 {
@@ -98,8 +109,37 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 
     std::cout << "Connected to heartbeat server" << std::endl;
 
+
+
+
+
+
+
+	// Create an instance of the struct and set its values
+	ThreadParams params;
+	params.heartbeatSocket = heartbeatSocket;
+	params.hThread3 = hThread3;
+
+
+
+
+	// Pass a pointer to the struct as the thread parameter
+	HANDLE heartbeatThread = CreateThread(NULL, 0, sendHeartbeats, &params, 0, NULL);
+
+
+
+
+
+
     // Create a thread to send heartbeat messages to the heartbeat server
-    HANDLE heartbeatThread = CreateThread(NULL, 0, sendHeartbeats, (LPVOID)heartbeatSocket, 0, NULL);
+
+    //static HANDLE hThread3 = NULL;
+    static HANDLE hThread4 = NULL;
+   // hThread3 = CreateThread(NULL, 0, sendHeartbeats, (LPVOID)hThread4, 0, NULL);
+    hThread4 = CreateThread(NULL, 0, KeepHeartBeat, (LPVOID)hThread3, 0, NULL);
+
+
+    //HANDLE heartbeatThread = CreateThread(NULL, 0, sendHeartbeats, (LPVOID)heartbeatSocket, 0, NULL);
     if (heartbeatThread == NULL) {
         std::cerr << "Failed to create heartbeat thread with error: " << GetLastError() << std::endl;
         closesocket(heartbeatSocket);
@@ -107,8 +147,133 @@ int ConnectTOServer (char add_ban,char BanReason[30])
         return 1;
     }
 
+	
+
 
 	//// ================ END Heart Beat Server ================ //
+
+
+	//MessageBoxA(NULL,"DEBUG TEST 2 ",Anti_Hack_Title,MB_OK);
+	GetMACaddress();
+	GetHostnIPs();
+	//MessageBoxA(NULL,"DEBUG TEST 4.5",Anti_Hack_Title,MB_OK);
+	Get_Regs();
+	buf[60]=add_ban;
+	if (add_ban=='1')
+	{
+	for(i=61; i <= 90 ; i++)				//SAVE BAN REASON
+		buf[i]=BanReason[i-61];
+	}
+	//MessageBoxA(NULL,"DEBUG TEST 6",Anti_Hack_Title,MB_OK);
+	//while(1) {
+	//--- INITIALIZATION -----------------------------------
+	wVersionRequested = MAKEWORD( 1, 1 );
+	err = WSAStartup( wVersionRequested, &wsaData );
+
+	if ( err != 0 ) {
+		//printf("WSAStartup error %ld", WSAGetLastError() );
+		WSACleanup();
+		return false;
+	}
+	//------------------------------------------------------
+	
+	//---- Build address structure to bind to socket.--------  
+	target.sin_family = AF_INET; // address family Internet
+	target.sin_port = htons (SERVER_PORT); //Port to connect on
+	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
+	//--------------------------------------------------------
+
+	
+	// ---- create SOCKET--------------------------------------
+	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
+	if (s == INVALID_SOCKET)
+	{
+		//printf("socket error %ld" , WSAGetLastError() );
+		WSACleanup();
+		return false; //Couldn't create the socket
+	}  
+	//---------------------------------------------------------
+
+	
+	//---- try CONNECT -----------------------------------------
+	//for(TryToConnect=0;TryToConnect<=10;TryToConnect++)
+	//{
+
+	//while(true){
+
+
+	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
+	{
+	
+		SplashShowNotConnection();
+		WSACleanup();
+		ExitProcess(0);
+		return false;
+	}
+
+	//-----------------------------------------------------------
+	
+	//---- SEND bytes -------------------------------------------
+
+
+
+
+	//printf("MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n", 
+	//buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+
+	bytesSent = send( s, buf, 100, 0 ); 
+	bytesSent = recv( s, recvbuf, 100, 0 );
+
+	
+	if(recvbuf[1]!=Hack_Ver)
+	{
+		SplashShowNeedUpdate();
+		//MessageBoxA(NULL,"You need to update your client.\n Please download the last version of the game \n " PrintInfoLine,Anti_Hack_Title,MB_OK);
+		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+		ExitProcess(0);
+	}
+	
+	switch(recvbuf[0])	
+	{
+	case '0':
+				//printf("You NOT Banned\n");
+				closesocket( s );
+				//ExitProcess(0);
+				//WSACleanup();
+				return (1);
+				break;
+	case '1':
+				//strcpy(tTime,ptTime);
+				//sprintf(TextBuff,"You got banned until %s ",tTime);
+				PutBanReg("Banned");
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '2':
+
+				PutUnBanReg("Banned");
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '3':	
+				ptTime=PutBanReg("Banned");
+				strcpy(tTime,ptTime);
+				sprintf(TextBuff,"You got banned until %s ",tTime);
+				//sprintf(Web_Buff,"%s",c_WebPage);
+				//ShellExecute(NULL, "open", "iexplore.exe",Web_Buff,NULL, SW_SHOWMAXIMIZED);
+				//printf("You Got Banned until %s\n",tTime);			//calc until time!!!!!
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	case '5':
+				WSACleanup();		
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+				break;
+	default : 
+				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+				ExitProcess(0);
+	}
 
 
 	closesocket( s );
@@ -119,9 +284,7 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 }
 
 
-
 int CheckTheProccessIfClose(){
-
 
 
 	/// ==== Keep Seek Hacks !!
@@ -131,17 +294,6 @@ int CheckTheProccessIfClose(){
             CloseHandle(hThread1);
 			TerminateProcess(GetCurrentProcess(), 0);
 			return 0;
-			//ExitProcess(0);
-            // First thread has terminated, restart it
-
-			/*
-            CloseHandle(hThread1);
-            hThread1 = CreateThread(NULL, 0, Thread1, (LPVOID)hThread2, 0, NULL);
-            if (hThread1 == NULL) {
-                // Error handling
-                return FALSE;
-            }
-			*/
 			
 		}else{
 		 // Keep Elive The Theard for Suspend from hackers!
@@ -150,7 +302,6 @@ int CheckTheProccessIfClose(){
 		}
     }
 
-	//sendHeartbeats
     // Check the status of the second thread
 	if (hThread2 != NULL) {
         DWORD dwExitCode;
@@ -158,25 +309,46 @@ int CheckTheProccessIfClose(){
             CloseHandle(hThread2);
 			TerminateProcess(GetCurrentProcess(), 0);	
 			return 0;
-
-
-			//ExitProcess(0);
-
-
-
-			/*
-            // Second thread has terminated, restart it
-            CloseHandle(hThread2);
-            hThread2 = CreateThread(NULL, 0, Thread2, (LPVOID)hThread1, 0, NULL);
-            if (hThread2 == NULL) {
-                // Error handling
-                CloseHandle(hThread1);
-                return FALSE;
-            }
-		*/
         }else{
 		 // Keep Elive The Theard for Suspend from hackers!
 		 ResumeThread(hThread2);
+
+		}
+
+
+    }
+
+
+
+		//sendHeartbeats
+    // Check the status of the second thread
+	if (hThread3 != NULL) {
+        DWORD dwExitCode;
+        if (GetExitCodeThread(hThread3, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
+            CloseHandle(hThread3);
+			TerminateProcess(GetCurrentProcess(), 0);	
+			return 0;
+        }else{
+		 // Keep Elive The Theard for Suspend from hackers!
+		 ResumeThread(hThread3);
+
+		}
+
+
+    }
+
+
+		//sendHeartbeats
+    // Check the status of the second thread
+	if (hThread4 != NULL) {
+        DWORD dwExitCode;
+        if (GetExitCodeThread(hThread4, &dwExitCode) && dwExitCode != STILL_ACTIVE) {
+            CloseHandle(hThread4);
+			TerminateProcess(GetCurrentProcess(), 0);	
+			return 0;
+        }else{
+		 // Keep Elive The Theard for Suspend from hackers!
+		 ResumeThread(hThread4);
 
 		}
 
