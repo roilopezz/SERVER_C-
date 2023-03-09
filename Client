@@ -1,4 +1,3 @@
-#include "windows.h"
 int ConnectTOServer (char add_ban,char BanReason[30])
 {
 	WORD		wVersionRequested;
@@ -23,63 +22,33 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 		buf[i]=BanReason[i-61];
 	}
 	//MessageBoxA(NULL,"DEBUG TEST 6",Anti_Hack_Title,MB_OK);
-	//while(true) {
+	//while(1) {
 	//--- INITIALIZATION -----------------------------------
 	wVersionRequested = MAKEWORD( 1, 1 );
 	err = WSAStartup( wVersionRequested, &wsaData );
 
 	if ( err != 0 ) {
 		//printf("WSAStartup error %ld", WSAGetLastError() );
-		
-		//SplashShowNotConnection();
-		closesocket(s);
 		WSACleanup();
-		//ExitProcess(0);
 		return false;
 	}
 	//------------------------------------------------------
+	
+	//---- Build address structure to bind to socket.--------  
+	target.sin_family = AF_INET; // address family Internet
+	target.sin_port = htons (SERVER_PORT); //Port to connect on
+	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
+	//--------------------------------------------------------
 
-
-
+	
 	// ---- create SOCKET--------------------------------------
 	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
 	if (s == INVALID_SOCKET)
 	{
 		//printf("socket error %ld" , WSAGetLastError() );
-		//SplashShowNotConnection();
-
-		closesocket(s);
 		WSACleanup();
-		//ExitProcess(0);
 		return false; //Couldn't create the socket
 	}  
-
-
-	/*
-    // set the socket to non-blocking mode
-    u_long mode = 1;
-    err = ioctlsocket(s, FIONBIO, &mode);
-    if (err == SOCKET_ERROR) {
-        printf("ioctlsocket failed: %d\n", WSAGetLastError());
-        closesocket(s);
-        WSACleanup();
-        return 1;
-    }
-	*/
-
-
-	//---- Build address structure to bind to socket.--------  
-	target.sin_family = AF_INET; // address family Internet
-	target.sin_port = htons (SERVER_PORT); //Port to connect on
-	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
-	//inet_pton(AF_INET, IPAddress, &target.sin_addr); // use the server's IP address
-	//--------------------------------------------------------
-
-	
-
-
-
-
 	//---------------------------------------------------------
 
 	
@@ -89,15 +58,14 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 
 	//while(true){
 
-	err = connect(s, (SOCKADDR *)&target, sizeof(target));
-	if (err == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+
+	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
 	{
 	
 		SplashShowNotConnection();
 		//printf("connect error %ld", WSAGetLastError() );
 		//printf("attempt to connect #%d to Anti-Hack Server \n",TryToConnect+1);
 		//MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
-		closesocket(s);
 		WSACleanup();
 		ExitProcess(0);
 		return false;
@@ -110,19 +78,13 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 		//	return false; //Couldn't connect
 		//}
 	}
-
-
-
-
-
-
-	//else{
-		//break;
+	//else
+	//	break;
 	//}
 
 	//Sleep(1000);
 	//}
-		
+
 
 	//-----------------------------------------------------------
 	
@@ -134,75 +96,10 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 	//printf("MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n", 
 	//buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
 
-	//bytesSent = send( s, buf, 100, 0 ); 
-
-
-
-
-
-//	bytesSent = recv( s, recvbuf, 100, 0 );
+	bytesSent = send( s, buf, 100, 0 ); 
+	bytesSent = recv( s, recvbuf, 100, 0 );
 
 	
-
-
-	    while (true) {
-        // send a message to the server
-      //  const char* message = "Are you there?";
-        //err = send(s, message, strlen(message), 0);
-		err = send( s, buf, 100, 0 ); 
-
-
-        if (err == SOCKET_ERROR) {
-			MessageBoxA(NULL,"send failed ",Anti_Hack_Title,MB_OK);
-			//closesocket( s );
-            printf("send failed: %d\n", WSAGetLastError());
-			//return 1;
-
-			break;
-        }
-
-        // wait for a response from the server
-       // err = recv(s, response, sizeof(response), 0);
-		err = recv( s, recvbuf, sizeof(recvbuf), 0 );
-
-
-		
-        if (err > 0) {
-           // printf("Received: %.*s\n", err, response);
-			//MessageBoxA(NULL,"Received ",Anti_Hack_Title,MB_OK);
-
-
-        }
-        else if (err == 0) {
-            printf("Connection closed\n");
-			//closesocket( s );
-			MessageBoxA(NULL,"Connection closed\n ",Anti_Hack_Title,MB_OK);
-			//ExitProcess(0);
-            break;
-			//return 1;
-
-        }
-        else {
-			//closesocket( s );
-			MessageBoxA(NULL,"recv failed\n ",Anti_Hack_Title,MB_OK);
-			return 1;
-			//ExitProcess(0);
-            //printf("recv failed: %d\n", WSAGetLastError());
-		   break;
-        }
-		
-        // sleep for a while before sending the next message
-       
-			Sleep(1000);
-			//break;
-
-	    }
-
-		
-
-
-
-
 	if(recvbuf[1]!=Hack_Ver)
 	{
 		SplashShowNeedUpdate();
@@ -252,9 +149,6 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 				DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
 				ExitProcess(0);
 	}
-	
-
-
 
 
 	closesocket( s );
@@ -262,3 +156,240 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 	return (0);
 }
 
+
+void StartUp (void) 
+{
+
+
+
+
+	int ConnectDone,FoundHack,FoundChangeFiles,FoundTitle , TitleCheckWindowS;
+
+
+	/*
+#ifdef PREMU
+	if(FindWindow(NULL,"Launcher 1.2") == NULL)
+	{
+		MessageBoxA(NULL,"You Mast Open the Launcher!",Anti_Hack_Title,MB_OK);
+		ExitProcess(0);
+	}
+#endif
+	*/
+
+
+	//if (FindWindow("","Premium Files"))
+	//{
+	//	MessageBoxA(NULL,"Running MU twice is not allowed.\n"PrintHelpLine,Anti_Hack_Title,MB_OK);
+	//	ExitProcess(0);
+	//}
+
+	ConnectDone=ConnectTOServer('0',"");
+
+	if (ConnectDone == 1)
+	{
+		//MessageBoxA(NULL,"DEBUG TEST 7",Anti_Hack_Title,MB_OK);
+		//printf("Start Memory Scan\n");
+		//FoundChangeFiles=PlayerMapsCheck();
+
+
+		// Memory Scan
+		FoundHack=SystemProcessesScan();
+
+		// Found bad Words
+		FoundTitle=Scan_Titles();
+
+		// Title Windows
+		TitleCheckWindowS=TitleCheckWindow();
+
+		// == ScanTaskManager == //
+		ClasseCheckPross();
+		// == END ScanTaskManager == //
+
+		// Check Class Names //
+		ClasseCheckWindow();
+
+
+	if (FoundHack==1 || FoundTitle==1 || TitleCheckWindowS == 1)
+		{
+
+			if (FoundHack==1){
+				Ban_Reason[0]='1';			
+			}
+
+			if (FoundTitle==1){
+				Ban_Reason[0]='2';
+			}
+
+			if(TitleCheckWindowS == 1){
+				Ban_Reason[0]='5';						
+			}
+
+			CloseHandle(hThread1);
+			CloseHandle(hThread2);
+			ConnectTOServer('1',Ban_Reason);
+			DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+			
+			//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+			ExitProcess(0);
+		}
+
+
+
+
+		/*
+		if (FoundChangeFiles==2)
+		{
+			MessageBoxA(NULL,"The Anti-Hack system found that some of the file has modified or deleted.\n Please reinstall the game for playing! \n"PrintHelpLine,Anti_Hack_Title,MB_OK);
+			ExitProcess(0);
+		}
+		*/
+
+
+		/*
+		if (FoundHack==1 || FoundChangeFiles==1 || FoundTitle==1)
+		{
+
+			if (FoundTitle==1)
+				Ban_Reason[0]='2';
+			if (FoundChangeFiles==1)
+				Ban_Reason[0]='3';
+			if (FoundHack==1)
+				Ban_Reason[0]='1';
+			ConnectTOServer('1',Ban_Reason);
+			DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+			ExitProcess(0);
+		}
+		*/
+	//	else
+		//{
+			//ChangeSerial();
+			//MainProtect();
+			//DWORD MyId,My,titles;
+		//}
+	
+	}
+	else
+	{
+		//MessageBoxA(NULL,"Unable to connect to Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+		DllMain(GetCurrentProcess(),DLL_PROCESS_DETACH,NULL);
+		ExitProcess(0);
+	}
+	
+}
+
+
+
+BOOL APIENTRY DllMain( HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
+{
+	static HANDLE hThread1 = NULL;
+    static HANDLE hThread2 = NULL;
+
+    switch (ul_reason_for_call) {
+    case DLL_PROCESS_ATTACH:
+		SetTimer(NULL, TIMER_ID, TIMER_INTERVAL, TimerProc);
+		
+		//CreateThread(NULL, 0, TESTER, (LPVOID)hThread3, 0, NULL);
+        hThread1 = CreateThread(NULL, 0, KeepSafe, (LPVOID)hThread2, 0, NULL);
+		hThread2 = CreateThread(NULL, 0, titleChangers, (LPVOID)hThread1, 0, NULL);
+      
+
+		if (hThread1 == NULL) {
+            // Error handling
+            CloseHandle(hThread2);
+            return FALSE;
+       }        
+		
+		if (hThread2 == NULL) {
+            // Error handling
+            CloseHandle(hThread1);
+            return FALSE;
+        }
+
+
+		ByRoiLopez();
+
+        break;
+
+    case DLL_PROCESS_DETACH:
+        // Do cleanup here
+		 KillTimer(NULL, TIMER_ID);
+
+
+
+
+		      if (hThread1 != NULL) {
+                CloseHandle(hThread1);
+                hThread1 = NULL;
+            }
+
+		      if (hThread2 != NULL) {
+                CloseHandle(hThread2);
+                hThread2 = NULL;
+            }
+
+
+						MainHWND=FindWindowA(NULL,"Premium Files");
+						//system("taskkill /IM Main_Supporter.exe");
+										switch(recvbuf[0])	
+										{
+										case '0':
+													break;
+										case '1':	
+
+													SplashShowUserBlock();
+													//MessageBoxA(MainHWND,"You banned from our server for using illegal software.\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
+													
+				 									WSACleanup();
+													break;
+										case '2':
+													// === Ban Over
+													SplashShowBanOver();
+													//MessageBoxA(MainHWND,"You no longer banned from our server.\n Please reset your game and start playing again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													WSACleanup();
+													break;
+										case '3':	
+													// ==== User Get Ban === //
+
+													//MessageBoxA(MainHWND,"You banned from our server for using illegal software!\n When your ban time will end , you will be allow to play again! \n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													//MessageBoxA(MainHWND,TextBuff,Anti_Hack_Title,MB_OK);
+													PrintLogs();
+													WSACleanup();
+													break;
+										case '4':
+													WSACleanup();		
+													MessageBoxA(MainHWND,"Unable to load the Main_Supporter.exe file!\n Make sure the file Main_Supporter.exe exist.\n " PrintHelpLine,Anti_Hack_Title,MB_OK );
+													break;
+										case '5':
+													WSACleanup();		
+													//MessageBoxA(MainHWND,"You using illegal software!\nReport sent to our Anti-Hack server. \nThe server team will examine the report and may decide to ban your account\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													PrintLogs();
+													ExitProcess(0);
+													break;
+										default : 
+													WSACleanup();		
+													//MessageBoxA(MainHWND,"Unable to get answer from Anti-Hack server.\n " PrintHelpLine,Anti_Hack_Title,MB_OK);
+													ExitProcess(0);
+													
+													break;
+										}
+
+        break;
+
+    case DLL_THREAD_ATTACH:
+        // Do thread-specific initialization here
+        break;
+
+    case DLL_THREAD_DETACH:
+        // Do thread-specific cleanup here
+        break;
+    }
+
+
+
+		
+
+
+
+    return TRUE;
+}
