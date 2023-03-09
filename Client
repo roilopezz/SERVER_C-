@@ -1,9 +1,4 @@
 #include "windows.h"
-#include <WinNT.h>
-
-
-
-
 int ConnectTOServer (char add_ban,char BanReason[30])
 {
 	WORD		wVersionRequested;
@@ -36,30 +31,55 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 	if ( err != 0 ) {
 		//printf("WSAStartup error %ld", WSAGetLastError() );
 		
-		SplashShowNotConnection();
+		//SplashShowNotConnection();
+		closesocket(s);
 		WSACleanup();
-		ExitProcess(0);
+		//ExitProcess(0);
 		return false;
 	}
 	//------------------------------------------------------
-	
-	//---- Build address structure to bind to socket.--------  
-	target.sin_family = AF_INET; // address family Internet
-	target.sin_port = htons (SERVER_PORT); //Port to connect on
-	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
-	//--------------------------------------------------------
 
-	
+
+
 	// ---- create SOCKET--------------------------------------
 	s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP); //Create socket
 	if (s == INVALID_SOCKET)
 	{
 		//printf("socket error %ld" , WSAGetLastError() );
-		SplashShowNotConnection();
+		//SplashShowNotConnection();
+
+		closesocket(s);
 		WSACleanup();
-		ExitProcess(0);
+		//ExitProcess(0);
 		return false; //Couldn't create the socket
 	}  
+
+
+	/*
+    // set the socket to non-blocking mode
+    u_long mode = 1;
+    err = ioctlsocket(s, FIONBIO, &mode);
+    if (err == SOCKET_ERROR) {
+        printf("ioctlsocket failed: %d\n", WSAGetLastError());
+        closesocket(s);
+        WSACleanup();
+        return 1;
+    }
+	*/
+
+
+	//---- Build address structure to bind to socket.--------  
+	target.sin_family = AF_INET; // address family Internet
+	target.sin_port = htons (SERVER_PORT); //Port to connect on
+	target.sin_addr.s_addr = inet_addr (IPAddress); //Target IP
+	//inet_pton(AF_INET, IPAddress, &target.sin_addr); // use the server's IP address
+	//--------------------------------------------------------
+
+	
+
+
+
+
 	//---------------------------------------------------------
 
 	
@@ -69,14 +89,15 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 
 	//while(true){
 
-
-	if (connect(s, (SOCKADDR *)&target, sizeof(target)) == SOCKET_ERROR)
+	err = connect(s, (SOCKADDR *)&target, sizeof(target));
+	if (err == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
 	{
 	
 		SplashShowNotConnection();
 		//printf("connect error %ld", WSAGetLastError() );
 		//printf("attempt to connect #%d to Anti-Hack Server \n",TryToConnect+1);
 		//MessageBoxA(NULL,"Unable to Connect to Anti-Hack Server \n ",Anti_Hack_Title,MB_OK);
+		closesocket(s);
 		WSACleanup();
 		ExitProcess(0);
 		return false;
@@ -135,9 +156,9 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 			MessageBoxA(NULL,"send failed ",Anti_Hack_Title,MB_OK);
 			//closesocket( s );
             printf("send failed: %d\n", WSAGetLastError());
-			return 1;
+			//return 1;
 
-          //  break;
+			break;
         }
 
         // wait for a response from the server
@@ -157,8 +178,8 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 			//closesocket( s );
 			MessageBoxA(NULL,"Connection closed\n ",Anti_Hack_Title,MB_OK);
 			//ExitProcess(0);
-           // break;
-			return 1;
+            break;
+			//return 1;
 
         }
         else {
@@ -167,13 +188,14 @@ int ConnectTOServer (char add_ban,char BanReason[30])
 			return 1;
 			//ExitProcess(0);
             //printf("recv failed: %d\n", WSAGetLastError());
-         //   break;
+		   break;
         }
 		
         // sleep for a while before sending the next message
        
-
 			Sleep(1000);
+			//break;
+
 	    }
 
 		
