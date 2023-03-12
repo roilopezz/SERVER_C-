@@ -55,10 +55,9 @@
 
 
 
-	std::vector<std::string> ipAddresses;
-	std::vector<std::string> users;
-	std::vector<std::string> hardwareIds;
-
+	static std::vector<std::string> ipAddresses;
+	static std::vector<std::string> users;
+	static std::vector<std::string> hardwareIds;
 
 
 int ServerOne_tmain()
@@ -224,22 +223,22 @@ int ServerOne_tmain()
 
 
 
-	// Get the client IP address
-	sockaddr_in saClient;
-	int nLength = sizeof(saClient);
-	getpeername(sa, (sockaddr*)&saClient, &nLength);
-	char szIPAddress[16];
-	inet_ntop(AF_INET, &saClient.sin_addr, szIPAddress, sizeof(szIPAddress));
-
 	// Get the user and hardware ID
 	char szUser[256] = "User1";
 	char szHardwareID[256] = "HWID1";
 
-	// Add the data to the vectors
-	ipAddresses.push_back(szIPAddress);
-	users.push_back(szUser);
-	hardwareIds.push_back(szHardwareID);
 
+	// Add the data to the vectors
+	ipAddresses.push_back(string(RemoteIP));
+
+
+
+	users.push_back(szUser);
+	hardwareIds.push_back((char*)MACData);
+
+
+
+	MessageBoxA(NULL,RemoteIP,RemoteIP,MB_OK);
 
 
 	//if(didlogonscr==1 || add_ban=='1'){
@@ -308,118 +307,6 @@ int ServerOne_tmain()
 	WSACleanup();
 	return 0;
 }
-
-
-DWORD WINAPI runHeartbeatServer(LPVOID lpParam)
-{
-    // Create a socket for the heartbeat server
-    SOCKET heartbeatSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (heartbeatSocket == INVALID_SOCKET) {
-        std::cerr << "Failed to create socket with error: " << WSAGetLastError() << std::endl;
-        return 1;
-    }
-
-    // Bind the socket to a local address and port for the heartbeat server
-    sockaddr_in heartbeatAddress;
-    heartbeatAddress.sin_family = AF_INET;
-    heartbeatAddress.sin_addr.s_addr = htonl(INADDR_ANY);
-    heartbeatAddress.sin_port = htons(HEARTBeat_PORT);
-
-
-    int result = bind(heartbeatSocket, (SOCKADDR*)&heartbeatAddress, sizeof(heartbeatAddress));
-
-    if (result == SOCKET_ERROR) {
-        std::cerr << "Failed to bind socket with error: " << WSAGetLastError() << std::endl;
-        closesocket(heartbeatSocket);
-        return 1;
-    }
-
-    // Listen for incoming connections for the heartbeat server
-    result = listen(heartbeatSocket, SOMAXCONN);
-    if (result == SOCKET_ERROR) {
-        std::cerr << "Failed to listen for incoming connections with error: " << WSAGetLastError() << std::endl;
-        closesocket(heartbeatSocket);
-        return 1;
-    }
-
-    //std::cout << "Heartbeat server is listening for incoming connections..." << std::endl;
-
-    // Accept incoming connections and send heartbeat messages
-    while (true) {
-        SOCKADDR_IN clientAddress;
-        int clientAddressSize = sizeof(clientAddress);
-        SOCKET clientSocket = accept(heartbeatSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
-        if (clientSocket == INVALID_SOCKET) {
-            std::cerr << "Failed to accept incoming connection with error: " << WSAGetLastError() << std::endl;
-            closesocket(heartbeatSocket);
-            return 1;
-        }
-
-        //std::cout << "Heartbeat server accepted incoming connection from " << inet_ntoa(clientAddress.sin_addr) << std::endl;
-
-        // Send heartbeat messages to the client
-        const char* heartbeatMessage = "heartbeat";
-        while (true) {
-            result = send(clientSocket, heartbeatMessage, strlen(heartbeatMessage), 0);
-            if (result == SOCKET_ERROR) {
-           //     std::cerr << "Failed to send heartbeat message with error: " << WSAGetLastError() << std::endl;
-			closesocket(clientSocket);
-			break;
-			}
-	//std::cout << "Heartbeat message sent to " << inet_ntoa(clientAddress.sin_addr) << std::endl;
-	Sleep(1000); // Wait for 1 second before sending the next heartbeat message
-	}
-
-    closesocket(clientSocket);
-}
-
-// Close the heartbeat server socket
-closesocket(heartbeatSocket);
-
-return 0;
-}
-
-
-
-
-DWORD WINAPI RoieLopezzzzz(LPVOID lpParam)
-{
-    WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cerr << "WSAStartup failed with error: " << result << std::endl;
-        return 1;
-    }
-
-    // Create two threads to run the heartbeat server and the other server concurrently
-    HANDLE heartbeatThread = CreateThread(NULL, 0, runHeartbeatServer, NULL, 0, NULL);
-    
-	
-	ServerOne_tmain();
-	
-	//HANDLE otherThread = CreateThread(NULL, 0, runOtherServer, NULL, 0, NULL);
-
-    // Wait for the threads to finish before exiting the program
-    WaitForSingleObject(heartbeatThread, INFINITE);
-   // WaitForSingleObject(otherThread, INFINITE);
-
-    // Close the thread handles
-    CloseHandle(heartbeatThread);
-    //CloseHandle(otherThread);
-
-    // Clean up Winsock
-    WSACleanup();
-
-    return 0;
-}
-
-
-
-
-
-
-
-
 
 
 
@@ -499,14 +386,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     lvItem.mask = LVIF_TEXT;
 
   // Clear the table
-SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
+	SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
+
+
+	//MessageBoxA(NULL,"DEBUG TEST 5",Anti_Hack_Title,MB_OK);
 
 // Add the data to the table
-//for (int i = 0; i < ipAddresses.size(); i++)
+for (int i = 0; i < ipAddresses.size(); i++){
+	MessageBoxA(NULL,"DEBUG TEST 5","hh",MB_OK);
 
-for (int i = 0; i < ipAddresses.size(); i++)
-
-{
     LVITEM lvItem;
     lvItem.mask = LVIF_TEXT;
     lvItem.iItem = i;
@@ -519,6 +407,7 @@ for (int i = 0; i < ipAddresses.size(); i++)
 
     SendMessage(hTable, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
 
+
     lvItem.iSubItem = 1;
 
     // Convert narrow character string to wide character string
@@ -527,6 +416,9 @@ for (int i = 0; i < ipAddresses.size(); i++)
     lvItem.pszText = userW;
 
     SendMessage(hTable, LVM_SETITEM, 0, (LPARAM)&lvItem);
+
+
+
 
     lvItem.iSubItem = 2;
 
@@ -554,17 +446,4 @@ for (int i = 0; i < ipAddresses.size(); i++)
 
 
     return 0;
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    switch (uMsg)
-    {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
 }
