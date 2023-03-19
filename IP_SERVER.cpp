@@ -1,14 +1,8 @@
 // GameGuardServer.cpp : Defines the entry point for the application.
-//
 
 #include "stdafx.h"
 #include "GameGuardServer.h"
 #include <CommCtrl.h>
-//#include "IP_SERVER.h"
-
-
-
-
 #include "stdafx.h"
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -19,317 +13,205 @@
 #include <set>
 #include <time.h>  // include time.h header
 
+#include "Logs.h"
+#include "BanList.h"
+
+// Define the menu items
+#define ID_FILE_EXIT 9001
+#define ID_HELP_ABOUT 9002
+#define ID_GET_PROCESS 9003
+
 
 #pragma comment(lib, "ws2_32.lib")
 
 
-	using namespace std;
+extern void GetMACaddress(void);
 
-	#define SERVER_PORT 55445
-	#define HEARTBeat_PORT 55446
+int checkBan;
+int AutoBanTime=2;
+int didbanname='1';
+int didlogtxt='1';
+int didlogonscr='1';
+extern int MacProtect;
+char ServerVers[3]={0};
+char HostNameData[20];
+char RemoteIP[17];
+char ban_status;
+char User_Name[20]={0};
+char add_ban;
+char BanReason[30]={0};
 
-	#define BUF_SIZE 4096  // block transfer size  
-	#define QUEUE_SIZE 100 
-	extern void ReadInis ( void );
-	extern void GetMACaddress(void);
-	extern void InitLogFile (void);
-	extern void PrintLog( char HostNameData[20] ,	char RemoteIP[17] , unsigned char MACData[6] , char User_Name[20] , char ban_status , char add_ban ) ;
-	extern void Print_Ban( char HostNameData[20] ,	char RemoteIP[17] , unsigned char MACData[6] , char User_Name[20] , char ban_status , char add_ban , char BanReason[30] ) ;
-	extern void Print_Ban_Logs( char HostNameData[20] ,	char RemoteIP[17] , unsigned char MACData[6] , char User_Name[20] , char ban_status , char add_ban , char BanReason[30] ) ;
-	extern char Check_Ban( char HostNameData[20] ,	char RemoteIP[17] , unsigned char MACData[6] , char User_Name[20] , char ban_status , char add_ban ) ;
-	extern int checkBan;
-	int AutoBanTime=2;
-	int didbanname='1';
-	int didlogtxt='1';
-	int didlogonscr='1';
-	extern int MacProtect;
-	char ServerVers[3]={0};
+unsigned char MACData[6];
 
-	unsigned char MACData[6];
-	char HostNameData[20];
-	char RemoteIP[17];
-	char ban_status;
-	char User_Name[20]={0};
-	char add_ban;
-	char BanReason[30]={0};
 
 
 
-	static std::vector<std::string> ipAddresses;
-	static std::vector<std::string> users;
-	static std::vector<std::string> hardwareIds;
 
-
-int ServerOne_tmain()
-{
-	int		b, l, on = 1;
-	char	recvbuf[100], banforever='0'; 
-	char	buf[100];
-	SOCKET	s, sa;
-	struct	sockaddr_in channel;  // holds IP address
-	WORD	wVersionRequested;
-	WSADATA wsaData;
-	int		err;
-	int		bytesRecv;
-
-	/*
-	unsigned char MACData[6];
-	char HostNameData[20];
-	char RemoteIP[17];
-	char ban_status;
-	char User_Name[20]={0};
-	char add_ban;
-	char BanReason[30]={0};
-	*/
-
-	int i;
-	SYSTEMTIME st;
-
-
-	printf(" \n");
-	printf("-------------------------------------------------------------- \n");
-	printf(" \n");
-	printf(" === Anti-Hack Server by RoiLopez === \n");
-	printf(" \n");
-	//GetMACaddress();
-	ReadInis(); // Load Config
-	printf(" \n");
-	printf(" [ == Users Blocked == ] \n");
-	printf(" \n");
-
-
-	InitLogFile();
-
-	wVersionRequested = MAKEWORD( 1, 1 );
-	err = WSAStartup( wVersionRequested, &wsaData );
-
-	if ( err != 0 ) {
-		printf("WSAStartup error %ld", WSAGetLastError() );
-		WSACleanup();
-		return false;
-	}
-	//------------------------------------------------------
-	                
-
-	//---- Build address structure to bind to socket.--------  
-	memset(&channel, 0, sizeof(channel));// zerochannel 
-	channel.sin_family = AF_INET; 
-	channel.sin_addr.s_addr = htonl(INADDR_ANY); 
-	channel.sin_port = htons(SERVER_PORT); 
-	//--------------------------------------------------------
-
-	// keep track of the number of connections
-	int numConnections = 0;
-
-	// ---- create SOCKET--------------------------------------
-	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);    
-	if (s < 0) {
-		printf("socket error %ld",WSAGetLastError() );
-		WSACleanup();
-		return false;
-	}
-
-	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on)); 
-	//---------------------------------------------------------
-
-	//---- BIND socket ----------------------------------------
-	b = bind(s, (struct sockaddr *) &channel, sizeof(channel)); 
-
-	if (b < 0) {
-		printf("bind error %ld", WSAGetLastError() ); 
-		WSACleanup();
-		return false;
-	}
-	//----------------------------------------------------------
-
-
-	//---- LISTEN socket ----------------------------------------
-	l = listen(s, QUEUE_SIZE);                 // specify queue size 
-	if (l < 0) {
-		printf("listen error %ld",WSAGetLastError() );
-		WSACleanup();
-		return false;
-	}
-
-
-	
-
-
-
-	//-----------------------------------------------------------
-	while (1) {
-	//---- ACCEPT connection ------------------------------------
-	//sa = accept(s, 0 , 0);                  // block for connection request  
-	int clientAddrLen = sizeof(channel);
-	sa = accept(s, (SOCKADDR*)&channel, &clientAddrLen);
-
-	if (sa < 0 || sa == INVALID_SOCKET) {
-		printf("accept error %ld ", WSAGetLastError() ); 
-		WSACleanup();
-		//return false;
-		continue;
-	}
-
-
-
-	//------------------------------------------------------------
-	// Socket is now set up and bound. Wait for connection and process it. 
-	
-	//---- RECV bytes --------------------------------------------
-	bytesRecv = recv( sa, recvbuf, sizeof(recvbuf), 0 );
-
-	//err = WSAGetLastError( );// 10057 = A request to send or receive data was disallowed because the socket is not connected and (when sending on a datagram socket using a sendto call) 
-	if ( bytesRecv == 0 || bytesRecv == WSAECONNRESET  || bytesRecv == INVALID_SOCKET) {
-      printf( "Connection Closed.\n");
-	  WSACleanup();
-	  return false;
-
-    }
-
-	//------------------------------------------------------------
-	// START OF DEFINE DATA RECV!!!!!!!!!!!
-	//---------------------------------------------------------------
-
-
-	for(i=0;i<=5;i++){
-		MACData[i]=recvbuf[i];
-	}
-	for(i=6;i <= 20 ; i++){
-		HostNameData[i-6]=recvbuf[i];	
-	}
-	for(i=21;i<=37;i++){
-		RemoteIP[i-21]=recvbuf[i];
-		ban_status=recvbuf[38];				//SAVE BAN STATUS
-	}
-
-
-	for(i=39; i <= 59 ; i++){
-		User_Name[i-39]=recvbuf[i];	//SAVE USERNAME
-	}
-
-	if (strcmp(User_Name,"") == 0){
-		strcpy(User_Name,"No_Name");
-	}
-
-
-	for(i=61; i <= 90 ; i++){
-		BanReason[i-61]=recvbuf[i]; //SAVE USERNAME
-	}				
-
-	//BanReason = 1 = Memory_scan , 2 = Title Scan , 3 = Wrond Client
-
-	add_ban=recvbuf[60];	//SAVE ADD BAN
-	GetLocalTime(&st);
-
-
-
-	// Get the user and hardware ID
-	char szUser[256] = "User1";
-	char szHardwareID[256] = "HWID1";
-
-
-	// Add the data to the vectors
-	ipAddresses.push_back(string(RemoteIP));
-
-
-
-	users.push_back(szUser);
-	hardwareIds.push_back((char*)MACData);
-
-
-
-	MessageBoxA(NULL,RemoteIP,RemoteIP,MB_OK);
-
-
-	//if(didlogonscr==1 || add_ban=='1'){
-	if(add_ban=='1' || Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban) ==  '1'){
-
-
-		if(Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban) ==  '1'){
-		printf(" -User Blocking : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)
-		
-		}else if(bytesRecv > 0){
-		printf(" -System Block User : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)
-		}
-
-
-	}else{
-	//printf(" -User connected : (%s), Date: %02d/%02d/%02d, Time: %02d:%02d:%02d, \n",RemoteIP, st.wDay , st.wMonth , st.wYear,st.wHour, st.wMinute, st.wSecond); //, //BanReason//ban_status)	
-	}
-
-
-	if(didlogtxt == 1 ){
-	PrintLog(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban);
-	}
-
-	if (add_ban=='1'){
-		Print_Ban_Logs(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban,BanReason);
-
-		if(BanReason[0] != '2' || didbanname == 1 ){
-			Print_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban,BanReason);
-			buf[0]='3';	
-		}
-
-		else{
-			buf[0]='5';	
-		}
-	}
-
-	else{
-		buf[0]=Check_Ban(HostNameData , RemoteIP , MACData , User_Name , ban_status , add_ban);
-	}
-	
-
-	
-	if (recvbuf[99]=='9'){
-		exit(0);
-	}
-
-	if (recvbuf[98]=='9'){
-		banforever='1';
-	}
-
-
-	buf[1]=ServerVers[0];
-	buf[2]=ServerVers[1];
-	buf[3]=AutoBanTime;
-
-	if (banforever=='1')
-	buf[0]='1'; 
-
-	bytesRecv = send( sa, buf, 100, 0 ); 
-	closesocket( sa );
-	}
-
-
-
-	closesocket( s );
-	WSACleanup();
-	return 0;
-}
-
-
-
-// Define the table control ID
-#define ID_TABLE 1001
-
-// Define the column headers
-LPCWSTR columnHeaders[] = {
-    L"IP",
-    L"Hardware ID",
-    L"Status"
-};
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+
+
+
+
+
+// Declare global variables
+HWND hProcessListButton;
+HWND hUserInput;
+
+// Declare function to handle button click
+//void OnProcessListButtonClicked(HWND hwnd) {
+void OnProcessListButtonClicked(){
+    // Get the text from the user input
+    char username[256];
+    GetWindowTextA(hUserInput, username, 256);
+
+	MessageBoxA(NULL,username,username,MB_OK);
+
+
+    // Send a message to the client to request the process list for the specified user
+    // Code to send message to client goes here
+}
+
+// Declare function to create the server window
+
+
+
+
+DWORD WINAPI MainGameGuard(LPVOID lpParam)
+{
+	/*
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0) {
+        std::cerr << "WSAStartup failed with error: " << result << std::endl;
+        return 1;
+    }
+	*/
+
+
+    // Create two threads to run the heartbeat server and the other server concurrently
+    HANDLE heartbeatThread = CreateThread(NULL, 0, runHeartbeatServer, NULL, 0, NULL);
+    HANDLE MainServerThread = CreateThread(NULL, 0, MainServer, NULL, 0, NULL);
+
+    
+	//();
+	
+	//HANDLE otherThread = CreateThread(NULL, 0, runOtherServer, NULL, 0, NULL);
+
+    // Wait for the threads to finish before exiting the program
+    WaitForSingleObject(heartbeatThread, INFINITE);
+    WaitForSingleObject(MainServerThread, INFINITE);
+
+   // WaitForSingleObject(otherThread, INFINITE);
+
+    // Close the thread handles
+    CloseHandle(heartbeatThread);
+    CloseHandle(MainServerThread);
+
+    // Clean up Winsock
+    WSACleanup();
+
+    return 0;
+}
+
+void OnAddLine(HWND hwndLV, const wchar_t* text)
+{
+    LVITEM lvItem = { 0 };
+    lvItem.mask = LVIF_TEXT;
+    lvItem.pszText = const_cast<wchar_t*>(text);
+
+    int index = ListView_InsertItem(hwndLV, &lvItem);
+
+    if (index != -1)
+    {
+        ListView_EnsureVisible(hwndLV, index, FALSE);
+
+        // Check if a new line has been added
+        int numLinesBefore = ListView_GetItemCount(hwndLV);
+        int numLinesAfter = numLinesBefore + 1;
+        if (numLinesAfter > numLinesBefore)
+        {
+            ListView_Scroll(hwndLV, 0, ListView_GetItemCount(hwndLV));
+        }
+    }
+}
+
+
+BOOL CreateServerWindow(HINSTANCE hInstance) {
+    // Register window class
+    WNDCLASS wc = {0};
+    wc.lpfnWndProc = DefWindowProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+    wc.lpszClassName = TEXT("ServerWindowClass");
+    if (!RegisterClass(&wc)) {
+        return FALSE;
+    }
+
+    // Create window
+    HWND hwnd = CreateWindow(
+        TEXT("ServerWindowClass"),
+        TEXT("Server"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 400, 200,
+        NULL, NULL, hInstance, NULL
+    );
+    if (!hwnd) {
+        return FALSE;
+    }
+
+    // Create user input field
+    hUserInput = CreateWindow(
+        TEXT("EDIT"),
+        TEXT(""),
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        10, 10, 200, 20,
+        hwnd, NULL, hInstance, NULL
+    );
+    if (!hUserInput) {
+        return FALSE;
+    }
+
+    // Create process list button
+    hProcessListButton = CreateWindow(
+        TEXT("BUTTON"),
+        TEXT("Get Process List"),
+        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+        10, 40, 150, 25,
+        hwnd, (HMENU)ID_GET_PROCESS, hInstance, NULL
+    );
+    if (!hProcessListButton) {
+        return FALSE;
+    }
+
+    // Show window
+    ShowWindow(hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(hwnd);
+
+
+ // Run the message loop
+    MSG msg = { 0 };
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return (int)msg.wParam;
+
+  //  return TRUE;
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
+	CreateThread(NULL, 0, MainGameGuard,NULL, 0, NULL);
+	//DWORD MyId;
+	//CreateThread(NULL,NULL,(LPTHREAD_START_ROUTINE)MainGameGuard,NULL,0,&MyId);
 
-		//();
-	CreateThread(NULL, 0, RoieLopezzzzz, (LPVOID)1, 0, NULL);
 
 
-    // Register the window class
+	    // Register the window class
     const wchar_t CLASS_NAME[]  = L"MyWindowClass";
     
     WNDCLASS wc = { };
@@ -340,15 +222,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     RegisterClass(&wc);
 
+
+
     // Create the window
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
-        L"GameGuardServer",
+        L"GameGuard",
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 500, 500,
+        //CW_USEDEFAULT, CW_USEDEFAULT, 800, 400,
+        CW_USEDEFAULT, CW_USEDEFAULT, 810, 400,
+
         NULL, NULL, hInstance, NULL
     );
+
 
     if (hwnd == NULL)
     {
@@ -357,78 +244,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
 
 
-    // Create the table control
-    HWND hTable = CreateWindowEx(
-        0,
-        WC_LISTVIEW,
-        L"",
-        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-        10, 10, 470, 450,
-        hwnd,
-        (HMENU)ID_TABLE,
-        hInstance,
-        NULL
-    );
+	CreateServerWindow(hInstance);
 
-    // Set the column headers
-    LVCOLUMN lvColumn = { };
-    lvColumn.mask = LVCF_TEXT | LVCF_WIDTH;
-    lvColumn.cx = 100;
+	titleGameGuard(hInstance,hwnd,nCmdShow);
 
-    for (int i = 0; i < 3; i++)
-    {
-        lvColumn.pszText = (LPWSTR)columnHeaders[i];
-        SendMessage(hTable, LVM_INSERTCOLUMN, i, (LPARAM)&lvColumn);
-    }
+	TableTaskProcess(hInstance,hwnd,nCmdShow);
+	//TableUsers(hInstance,hwnd , nCmdShow);
 
-    // Add some items to the table
-    LVITEM lvItem = { };
-    lvItem.mask = LVIF_TEXT;
 
   // Clear the table
-	SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
-
-
-	//MessageBoxA(NULL,"DEBUG TEST 5",Anti_Hack_Title,MB_OK);
-
-// Add the data to the table
-for (int i = 0; i < ipAddresses.size(); i++){
-	MessageBoxA(NULL,"DEBUG TEST 5","hh",MB_OK);
-
-    LVITEM lvItem;
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iItem = i;
-    lvItem.iSubItem = 0;
-
-    // Convert narrow character string to wide character string
-    wchar_t ipAddressW[256];
-    MultiByteToWideChar(CP_ACP, 0, ipAddresses[i].c_str(), -1, ipAddressW, 256);
-    lvItem.pszText = ipAddressW;
-
-    SendMessage(hTable, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
-
-
-    lvItem.iSubItem = 1;
-
-    // Convert narrow character string to wide character string
-    wchar_t userW[256];
-    MultiByteToWideChar(CP_ACP, 0, users[i].c_str(), -1, userW, 256);
-    lvItem.pszText = userW;
-
-    SendMessage(hTable, LVM_SETITEM, 0, (LPARAM)&lvItem);
+	//SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
 
 
 
-
-    lvItem.iSubItem = 2;
-
-    // Convert narrow character string to wide character string
-    wchar_t hardwareIdW[256];
-    MultiByteToWideChar(CP_ACP, 0, hardwareIds[i].c_str(), -1, hardwareIdW, 256);
-    lvItem.pszText = hardwareIdW;
-
-    SendMessage(hTable, LVM_SETITEM, 0, (LPARAM)&lvItem);
-}
 
     // Show the window
     ShowWindow(hwnd, nCmdShow);
@@ -436,8 +264,13 @@ for (int i = 0; i < ipAddresses.size(); i++){
     // Run the message loop
     MSG msg = { };
 
+
     while (GetMessage(&msg, NULL, 0, 0))
     {
+	  
+
+		// Ensure that the last item is visible
+
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -446,4 +279,210 @@ for (int i = 0; i < ipAddresses.size(); i++){
 
 
     return 0;
+	}
+
+	
+	
+
+
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+
+HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
+HFONT hFont = CreateFont(23, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Tahoma");
+
+int lineHeight = 16; // Change this value to set the height of each line of text
+int numVisibleLines = 10; // Change this value to set the number of visible lines in the list view
+int clientHeight = numVisibleLines * lineHeight;
+int prevScrollPos = 0;
+
+    switch (uMsg)
+    {
+
+		// Change Color
+
+/*
+    case WM_CTLCOLORSTATIC:
+    {
+        HDC hdcStatic = (HDC)wParam;
+       // SetBkColor(hdcStatic, RGB(255, 255, 255)); // Set the background color of the text
+        SetTextColor(hdcStatic, RGB(252, 0, 0)); // Set the text color
+        SelectObject(hdcStatic, hFont); // Select the font to use
+        return (INT_PTR)hBrush;
+    }
+
+
+	
+	case WM_ERASEBKGND:
+	{
+		MessageBox(hwnd, L"WM_ERASEBKGND received", L"Debug", MB_OK);
+		HDC hdc = reinterpret_cast<HDC>(wParam);
+		RECT rect;
+		GetClientRect(hwnd, &rect);
+		HBRUSH hBrush = CreateSolidBrush(RGB(24, 0, 0));
+		FillRect(hdc, &rect, hBrush);
+		DeleteObject(hBrush);
+		return TRUE;
+	}
+	*/
+
+
+    case WM_CTLCOLORSTATIC:
+    {
+        HDC hdcStatic = (HDC)wParam;
+       // SetBkColor(hdcStatic, RGB(255, 255, 255)); // Set the background color of the text
+        SetTextColor(hdcStatic, RGB(4, 161, 255)); // Set the text color
+        SelectObject(hdcStatic, hFont); // Select the font to use
+        return (INT_PTR)hBrush;
+    }
+
+
+		case WM_CREATE:
+		{
+			// Create the menu
+			HMENU hMenu = CreateMenu();
+			HMENU hFileMenu = CreatePopupMenu();
+			HMENU hHelpMenu = CreatePopupMenu();
+
+			// Add items to the file menu
+			AppendMenu(hFileMenu, MF_STRING, ID_FILE_EXIT, L"Exit");
+
+			// Add items to the help menu
+			AppendMenu(hHelpMenu, MF_STRING, ID_HELP_ABOUT, L"About");
+
+			// Add the submenus to the main menu
+			AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"File");
+			AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hHelpMenu, L"Help");
+
+			// Set the menu for the window
+			SetMenu(hwnd, hMenu);
+
+			break;
+		}
+
+		// In your window's message loop, handle the WM_COMMAND message like this:
+		case WM_COMMAND:
+		{
+
+
+			if (LOWORD(wParam) == ID_GET_PROCESS && HIWORD(wParam) == BN_CLICKED) {
+                // Call the function to handle button click
+			//MessageBoxA(NULL,"דגכדג","כדגכדכ",MB_OK);
+				 MessageBox(hwnd, L"The button was clicked!", L"Button clicked", MB_OK);
+               // OnProcessListButtonClicked();
+            }
+            break;
+
+			switch (LOWORD(wParam))
+			{
+
+				//OnProcessListButtonClicked
+
+
+
+
+
+				case ID_FILE_EXIT:
+					// Handle the "Exit" menu item
+					DestroyWindow(hwnd);
+					break;
+
+				case ID_HELP_ABOUT:
+					// Handle the "About" menu item
+					MessageBox(hwnd, L"GameGuard by RoiLopez", L"GameGuard", MB_OK | MB_ICONINFORMATION);
+					break;
+
+				default:
+					break;
+			}
+
+			break;
+		}
+
+
+
+			// Scroll Bar
+			 case WM_VSCROLL:
+        switch (LOWORD(wParam))
+		  {
+            case SB_LINEUP:
+                // Scroll up one line
+                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) - 1, TRUE);
+                ScrollWindowEx(hwnd, 0, -lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
+                break;
+
+            case SB_LINEDOWN:
+                // Scroll down one line
+                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) + 1, TRUE);
+                ScrollWindowEx(hwnd, 0, lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
+                break;
+
+
+
+
+            case SB_PAGEUP:
+                // Scroll up one page
+                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) - numVisibleLines, TRUE);
+                ScrollWindowEx(hwnd, 0, -clientHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
+                break;
+
+            case SB_PAGEDOWN:
+                // Scroll down one page
+                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) + numVisibleLines, TRUE);
+                ScrollWindowEx(hwnd, 0, clientHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
+                break;
+
+
+
+            case SB_THUMBPOSITION:
+            case SB_THUMBTRACK:
+                // Scroll to the specified position
+                int scrollPos = HIWORD(wParam);
+                SetScrollPos(hwnd, SB_VERT, scrollPos, TRUE);
+                ScrollWindowEx(hwnd, 0, (prevScrollPos - scrollPos) * lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
+                prevScrollPos = scrollPos;
+                break;
+        }
+
+		/*
+        case WM_SIZE:
+        {
+            int width = LOWORD(lParam);
+            int height = HIWORD(lParam);
+
+
+			  // Resize child windows
+            HWND hChildWnd = GetWindow(hwnd, GW_CHILD);
+            while (hChildWnd)
+            {
+                MoveWindow(hChildWnd, 0, 0, width, height, TRUE);
+                hChildWnd = GetWindow(hChildWnd, GW_HWNDNEXT);
+            }
+
+            // כאן יש להתאים את גודל האלמנט לגודל החדש של החלון
+          //  SetWindowPos(hTable, NULL, 0, 15, width, height, SWP_NOZORDER);
+
+            break;
+        }
+
+		*/
+
+
+
+
+    case WM_DESTROY:
+    {
+        DeleteObject(hBrush);
+        DeleteObject(hFont);
+        PostQuitMessage(0);
+        break;
+    }
+
+
+
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
 }
