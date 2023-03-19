@@ -191,16 +191,9 @@ BOOL CreateServerWindow(HINSTANCE hInstance) {
     UpdateWindow(hwnd);
 
 
- // Run the message loop
-    MSG msg = { 0 };
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
 
-    return (int)msg.wParam;
 
-  //  return TRUE;
+   return TRUE;
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -276,9 +269,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
 
+    return (int)msg.wParam;
 
-
-    return 0;
+    //return 0;
 	}
 
 	
