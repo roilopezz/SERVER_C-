@@ -1,481 +1,192 @@
-// GameGuardServer.cpp : Defines the entry point for the application.
-
 #include "stdafx.h"
 #include "GameGuardServer.h"
 #include <CommCtrl.h>
-#include "stdafx.h"
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <ws2spi.h>
-#include <iostream>
 #include <string>
-#include <vector>
-#include <set>
-#include <time.h>  // include time.h header
+#include <Winsock2.h>
+#include <Ws2tcpip.h>  // for inet_ntop
 
-#include "Logs.h"
-#include "BanList.h"
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
 
-// Define the menu items
-#define ID_FILE_EXIT 9001
-#define ID_HELP_ABOUT 9002
-#define ID_GET_PROCESS 9003
+//int sessionIDCounter = 1; // start with session ID 1 and increment for each new connection
+static char uniid;
+#define MAX_BUFF_SIZE 1024
+SOCKET clientSocket;
+
+std::vector<ClientInfo> clients;
+
+char* heartbeatMessage = "heartbeat";
+
+// A struct to hold information about a connected client
 
 
-#pragma comment(lib, "ws2_32.lib")
-
-
-extern void GetMACaddress(void);
-
-int checkBan;
-int AutoBanTime=2;
-int didbanname='1';
-int didlogtxt='1';
-int didlogonscr='1';
-extern int MacProtect;
-char ServerVers[3]={0};
-char HostNameData[20];
-char RemoteIP[17];
-char ban_status;
-char User_Name[20]={0};
-char add_ban;
-char BanReason[30]={0};
-
-unsigned char MACData[6];
+// A vector to store information about all connected clients
 
 
 
+void SendDataToClient(char* sessionID) {
+		 char recvBuf[1024];
+		 int recvBufLen = sizeof(recvBuf);
+		for (int i = 0; i < clients.size(); i++) {
+		 ClientInfo& client = clients[i];
+		
+			  if (client.sessionID.compare(sessionID) == 0){
+		// if (client.sessionID == sessionID){
+				
+				// Change the value for take the process List from the user
+		 heartbeatMessage = "REQ_PROCESS_LIST";
 
+		
+		// Receive the task manager data from the client
+        int bytesReceived = recv(client.socket, recvBuf, recvBufLen, 0);
+        if (bytesReceived == SOCKET_ERROR) {
+            // Handle error
+        } else if (bytesReceived == 0) {
+            // Connection closed
+            break;
+        } else {
 
+			
+		// Send	recvBuf to the function
+			OnTastManager(recvBuf);
+        }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-
-
-
-
-
-// Declare global variables
-HWND hProcessListButton;
-HWND hUserInput;
-
-// Declare function to handle button click
-//void OnProcessListButtonClicked(HWND hwnd) {
-void OnProcessListButtonClicked(){
-    // Get the text from the user input
-    char username[256];
-    GetWindowTextA(hUserInput, username, 256);
-
-	MessageBoxA(NULL,username,username,MB_OK);
-
-
-    // Send a message to the client to request the process list for the specified user
-    // Code to send message to client goes here
+			  }
+		 
+		 else{
+			 break;
+				 //MessageBox(NULL, TEXT("nottttt  FOUNDDD"), TEXT("nottttt FOUNDDD"), MB_OK);
+			  }
+			  
+	}
 }
 
-// Declare function to create the server window
 
-
-
-
-DWORD WINAPI MainGameGuard(LPVOID lpParam)
+DWORD WINAPI runHeartbeatServer(LPVOID lpParam)
 {
-	/*
-    WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cerr << "WSAStartup failed with error: " << result << std::endl;
+	char recvBuf[1024];
+    int recvBufLen = sizeof(recvBuf);
+	WSADATA wsaData;
+    int result2 = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result2 != 0) {
+        std::cerr << "WSAStartup failed with error: " << result2 << std::endl;
         return 1;
     }
-	*/
+
+    // Create a socket for the heartbeat server
+    SOCKET heartbeatSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (heartbeatSocket == INVALID_SOCKET) {
+        std::cerr << "Failed to create socket with error: " << WSAGetLastError() << std::endl;
+        return 1;
+    }
+
+    // Bind the socket to a local address and port for the heartbeat server
+    sockaddr_in heartbeatAddress;
+    heartbeatAddress.sin_family = AF_INET;
+    heartbeatAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+    heartbeatAddress.sin_port = htons(HEARTBeat_PORT);
 
 
-    // Create two threads to run the heartbeat server and the other server concurrently
-    HANDLE heartbeatThread = CreateThread(NULL, 0, runHeartbeatServer, NULL, 0, NULL);
-    HANDLE MainServerThread = CreateThread(NULL, 0, MainServer, NULL, 0, NULL);
+    int result = bind(heartbeatSocket, (SOCKADDR*)&heartbeatAddress, sizeof(heartbeatAddress));
 
-    
-	//();
-	
-	//HANDLE otherThread = CreateThread(NULL, 0, runOtherServer, NULL, 0, NULL);
+    if (result == SOCKET_ERROR) {
+        std::cerr << "Failed to bind socket with error: " << WSAGetLastError() << std::endl;
+        closesocket(heartbeatSocket);
+        return 1;
+    }
 
-    // Wait for the threads to finish before exiting the program
-    WaitForSingleObject(heartbeatThread, INFINITE);
-    WaitForSingleObject(MainServerThread, INFINITE);
+    // Listen for incoming connections for the heartbeat server
+    result = listen(heartbeatSocket, SOMAXCONN);
+    if (result == SOCKET_ERROR) {
+        std::cerr << "Failed to listen for incoming connections with error: " << WSAGetLastError() << std::endl;
+        closesocket(heartbeatSocket);
+        return 1;
+    }
 
-   // WaitForSingleObject(otherThread, INFINITE);
+    //std::cout << "Heartbeat server is listening for incoming connections..." << std::endl;
 
-    // Close the thread handles
-    CloseHandle(heartbeatThread);
-    CloseHandle(MainServerThread);
 
-    // Clean up Winsock
-    WSACleanup();
 
-    return 0;
-}
 
-void OnAddLine(HWND hwndLV, const wchar_t* text)
-{
-    LVITEM lvItem = { 0 };
-    lvItem.mask = LVIF_TEXT;
-    lvItem.pszText = const_cast<wchar_t*>(text);
 
-    int index = ListView_InsertItem(hwndLV, &lvItem);
-
-    if (index != -1)
-    {
-        ListView_EnsureVisible(hwndLV, index, FALSE);
-
-        // Check if a new line has been added
-        int numLinesBefore = ListView_GetItemCount(hwndLV);
-        int numLinesAfter = numLinesBefore + 1;
-        if (numLinesAfter > numLinesBefore)
-        {
-            ListView_Scroll(hwndLV, 0, ListView_GetItemCount(hwndLV));
+    // Accept incoming connections and send heartbeat messages
+    while (true) {
+        SOCKADDR_IN clientAddress;
+        int clientAddressSize = sizeof(clientAddress);
+        clientSocket = accept(heartbeatSocket, (SOCKADDR*)&clientAddress, &clientAddressSize);
+        if (clientSocket == INVALID_SOCKET) {
+            std::cerr << "Failed to accept incoming connection with error: " << WSAGetLastError() << std::endl;
+			MessageBoxA(NULL,"Failed to accept incoming connection with error","Failed to accept incoming connection with error",MB_OK);
+            
+			closesocket(heartbeatSocket);
+            return 1;
         }
-    }
-}
 
 
-BOOL CreateServerWindow(HINSTANCE hInstance) {
-    // Register window class
-    WNDCLASS wc = {0};
-    wc.lpfnWndProc = DefWindowProc;
-    wc.hInstance = hInstance;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
-    wc.lpszClassName = TEXT("ServerWindowClass");
-    if (!RegisterClass(&wc)) {
-        return FALSE;
-    }
+    UUID uuid;
+    UuidCreate(&uuid);
 
-    // Create window
-    HWND hwnd = CreateWindow(
-        TEXT("ServerWindowClass"),
-        TEXT("Server"),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 400, 200,
-        NULL, NULL, hInstance, NULL
-    );
-    if (!hwnd) {
-        return FALSE;
-    }
-
-    // Create user input field
-    hUserInput = CreateWindow(
-        TEXT("EDIT"),
-        TEXT(""),
-        WS_CHILD | WS_VISIBLE | WS_BORDER,
-        10, 10, 200, 20,
-        hwnd, NULL, hInstance, NULL
-    );
-    if (!hUserInput) {
-        return FALSE;
-    }
-
-    // Create process list button
-    hProcessListButton = CreateWindow(
-        TEXT("BUTTON"),
-        TEXT("Get Process List"),
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        10, 40, 150, 25,
-        hwnd, (HMENU)ID_GET_PROCESS, hInstance, NULL
-    );
-    if (!hProcessListButton) {
-        return FALSE;
-    }
-
-    // Show window
-    ShowWindow(hwnd, SW_SHOWDEFAULT);
-    UpdateWindow(hwnd);
+    unsigned char* str;
+    UuidToStringA(&uuid, &str);
+   // printf("UUID: %s\n", str);
 
 
 
+	char tt[37];
+	sprintf(tt,"%s",str);
 
-   return TRUE;
-}
-
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
-{
-	CreateThread(NULL, 0, MainGameGuard,NULL, 0, NULL);
-	//DWORD MyId;
-	//CreateThread(NULL,NULL,(LPTHREAD_START_ROUTINE)MainGameGuard,NULL,0,&MyId);
+	clients.push_back(ClientInfo(clientSocket, tt));
 
 
-
-	    // Register the window class
-    const wchar_t CLASS_NAME[]  = L"MyWindowClass";
-    
-    WNDCLASS wc = { };
-
-    wc.lpfnWndProc   = WindowProc;
-    wc.hInstance     = hInstance;
-    wc.lpszClassName = CLASS_NAME;
-
-    RegisterClass(&wc);
+	//MessageBoxA(NULL,tt,tt,MB_OK);
+	//sessionIDCounter++; // increment session ID counter for next connection
 
 
 
-    // Create the window
-    HWND hwnd = CreateWindowEx(
-        0,
-        CLASS_NAME,
-        L"GameGuard",
-        WS_OVERLAPPEDWINDOW,
-        //CW_USEDEFAULT, CW_USEDEFAULT, 800, 400,
-        CW_USEDEFAULT, CW_USEDEFAULT, 810, 400,
+        //std::cout << "Heartbeat server accepted incoming connection from " << inet_ntoa(clientAddress.sin_addr) << std::endl;
 
-        NULL, NULL, hInstance, NULL
-    );
+        // Send heartbeat messages to the client
+      //  const char* heartbeatMessage = "heartbeat";
+        while (true) {
+            result = send(clientSocket, heartbeatMessage, strlen(heartbeatMessage), 0);
+            if (result == SOCKET_ERROR) {
 
+			//char RemoteIP[128];
+			//inet_ntop(heartbeatAddress.sin_family, get_in_addr((struct sockaddr*)&heartbeatAddress), RemoteIP, sizeof RemoteIP);
 
-    if (hwnd == NULL)
-    {
-        return 0;
-    }
+			char clientIP[INET_ADDRSTRLEN];
+			inet_ntop(AF_INET, &(clientAddress.sin_addr), clientIP, INET_ADDRSTRLEN);
 
 
 
-	CreateServerWindow(hInstance);
-
-	titleGameGuard(hInstance,hwnd,nCmdShow);
-
-	TableTaskProcess(hInstance,hwnd,nCmdShow);
-	//TableUsers(hInstance,hwnd , nCmdShow);
+			wchar_t ipAddressW[256];
+			MultiByteToWideChar(CP_ACP, 0, clientIP, -1, ipAddressW, 256);
+			DeleteItemByIP(ipAddressW);
 
 
-  // Clear the table
-	//SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
+			//MessageBoxA(NULL,clientIP,"Client disconnected",MB_OK);
 
 
-
-
-    // Show the window
-    ShowWindow(hwnd, nCmdShow);
-
-    // Run the message loop
-    MSG msg = { };
-
-
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
-	  
-
-		// Ensure that the last item is visible
-
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-
-    return (int)msg.wParam;
-
-    //return 0;
-	}
-
-	
-	
-
-
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-
-HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
-HFONT hFont = CreateFont(23, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Tahoma");
-
-int lineHeight = 16; // Change this value to set the height of each line of text
-int numVisibleLines = 10; // Change this value to set the number of visible lines in the list view
-int clientHeight = numVisibleLines * lineHeight;
-int prevScrollPos = 0;
-
-    switch (uMsg)
-    {
-
-		// Change Color
-
-/*
-    case WM_CTLCOLORSTATIC:
-    {
-        HDC hdcStatic = (HDC)wParam;
-       // SetBkColor(hdcStatic, RGB(255, 255, 255)); // Set the background color of the text
-        SetTextColor(hdcStatic, RGB(252, 0, 0)); // Set the text color
-        SelectObject(hdcStatic, hFont); // Select the font to use
-        return (INT_PTR)hBrush;
-    }
-
-
-	
-	case WM_ERASEBKGND:
-	{
-		MessageBox(hwnd, L"WM_ERASEBKGND received", L"Debug", MB_OK);
-		HDC hdc = reinterpret_cast<HDC>(wParam);
-		RECT rect;
-		GetClientRect(hwnd, &rect);
-		HBRUSH hBrush = CreateSolidBrush(RGB(24, 0, 0));
-		FillRect(hdc, &rect, hBrush);
-		DeleteObject(hBrush);
-		return TRUE;
-	}
-	*/
-
-
-    case WM_CTLCOLORSTATIC:
-    {
-        HDC hdcStatic = (HDC)wParam;
-       // SetBkColor(hdcStatic, RGB(255, 255, 255)); // Set the background color of the text
-        SetTextColor(hdcStatic, RGB(4, 161, 255)); // Set the text color
-        SelectObject(hdcStatic, hFont); // Select the font to use
-        return (INT_PTR)hBrush;
-    }
-
-
-		case WM_CREATE:
-		{
-			// Create the menu
-			HMENU hMenu = CreateMenu();
-			HMENU hFileMenu = CreatePopupMenu();
-			HMENU hHelpMenu = CreatePopupMenu();
-
-			// Add items to the file menu
-			AppendMenu(hFileMenu, MF_STRING, ID_FILE_EXIT, L"Exit");
-
-			// Add items to the help menu
-			AppendMenu(hHelpMenu, MF_STRING, ID_HELP_ABOUT, L"About");
-
-			// Add the submenus to the main menu
-			AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"File");
-			AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hHelpMenu, L"Help");
-
-			// Set the menu for the window
-			SetMenu(hwnd, hMenu);
-
+			//SendMessage(hTable, LVM_DELETEALLITEMS, 0, 0);
+			//MessageBoxA(NULL,"Client disconnected","Client disconnected",MB_OK);
+			closesocket(clientSocket);
 			break;
-		}
-
-		// In your window's message loop, handle the WM_COMMAND message like this:
-		case WM_COMMAND:
-		{
-
-
-			if (LOWORD(wParam) == ID_GET_PROCESS && HIWORD(wParam) == BN_CLICKED) {
-                // Call the function to handle button click
-			//MessageBoxA(NULL,"דגכדג","כדגכדכ",MB_OK);
-				 MessageBox(hwnd, L"The button was clicked!", L"Button clicked", MB_OK);
-               // OnProcessListButtonClicked();
-            }
-            break;
-
-			switch (LOWORD(wParam))
-			{
-
-				//OnProcessListButtonClicked
-
-
-
-
-
-				case ID_FILE_EXIT:
-					// Handle the "Exit" menu item
-					DestroyWindow(hwnd);
-					break;
-
-				case ID_HELP_ABOUT:
-					// Handle the "About" menu item
-					MessageBox(hwnd, L"GameGuard by RoiLopez", L"GameGuard", MB_OK | MB_ICONINFORMATION);
-					break;
-
-				default:
-					break;
 			}
 
-			break;
-		}
 
 
 
-			// Scroll Bar
-			 case WM_VSCROLL:
-        switch (LOWORD(wParam))
-		  {
-            case SB_LINEUP:
-                // Scroll up one line
-                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) - 1, TRUE);
-                ScrollWindowEx(hwnd, 0, -lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
-                break;
-
-            case SB_LINEDOWN:
-                // Scroll down one line
-                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) + 1, TRUE);
-                ScrollWindowEx(hwnd, 0, lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
-                break;
+	//std::cout << "Heartbeat message sent to " << inet_ntoa(clientAddress.sin_addr) << std::endl;
+	Sleep(1000); // Wait for 1 second before sending the next heartbeat message
+	}
 
 
 
+    closesocket(clientSocket);
+}
 
-            case SB_PAGEUP:
-                // Scroll up one page
-                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) - numVisibleLines, TRUE);
-                ScrollWindowEx(hwnd, 0, -clientHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
-                break;
+// Close the heartbeat server socket
+closesocket(heartbeatSocket);
 
-            case SB_PAGEDOWN:
-                // Scroll down one page
-                SetScrollPos(hwnd, SB_VERT, GetScrollPos(hwnd, SB_VERT) + numVisibleLines, TRUE);
-                ScrollWindowEx(hwnd, 0, clientHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
-                break;
-
-
-
-            case SB_THUMBPOSITION:
-            case SB_THUMBTRACK:
-                // Scroll to the specified position
-                int scrollPos = HIWORD(wParam);
-                SetScrollPos(hwnd, SB_VERT, scrollPos, TRUE);
-                ScrollWindowEx(hwnd, 0, (prevScrollPos - scrollPos) * lineHeight, NULL, NULL, NULL, NULL, SW_INVALIDATE);
-                prevScrollPos = scrollPos;
-                break;
-        }
-
-		/*
-        case WM_SIZE:
-        {
-            int width = LOWORD(lParam);
-            int height = HIWORD(lParam);
-
-
-			  // Resize child windows
-            HWND hChildWnd = GetWindow(hwnd, GW_CHILD);
-            while (hChildWnd)
-            {
-                MoveWindow(hChildWnd, 0, 0, width, height, TRUE);
-                hChildWnd = GetWindow(hChildWnd, GW_HWNDNEXT);
-            }
-
-            // כאן יש להתאים את גודל האלמנט לגודל החדש של החלון
-          //  SetWindowPos(hTable, NULL, 0, 15, width, height, SWP_NOZORDER);
-
-            break;
-        }
-
-		*/
-
-
-
-
-    case WM_DESTROY:
-    {
-        DeleteObject(hBrush);
-        DeleteObject(hFont);
-        PostQuitMessage(0);
-        break;
-    }
-
-
-
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
+return 0;
 }
